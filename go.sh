@@ -18,7 +18,7 @@ conda activate torch-xla-1.7
 export LOGDIR="${LOGDIR:-gs://${BUCKET}/log-$(date '+%Y%m%d%H%M%S')}"
 echo "Profiling data in $LOGDIR"
 if ! gsutil ls ${IMAGE_DIR}/imagenetindex.json ; then
- python mydataloader.py cache
+ python gcsdataset.py cache
 fi
 time python -m torch_xla.distributed.xla_dist --tpu=$TPU_NAME --conda-env=torch-xla-1.7 --env XLA_USE_BF16=1 -- python /tmp/thepackage/test_train_mp_imagenet.py \
     --num_epochs=$NUM_EPOCHS \
