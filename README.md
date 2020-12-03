@@ -24,16 +24,16 @@ Every TPU will get a node from the instance group, so the instance group will ha
 imagenet/train/nXXXXXX/file.jpg
 imagenet/val/nXXXXXX/file.jpg
 ```
-For more information on how to download and process the full ImageNet dataset, see [Downloading, preprocessing, and uploading the ImageNet dataset](https://cloud.google.com/tpu/docs/imagenet-setup)
 
 > #### TODO: add more about dataprep here.
-
 
 Getting the data in-place is out of scope for now. For a quick overview:
 
 1. Get the 2012 training archive and unpack into files that look like n1231231.tar. Each of those neeeds to ne unpacked into it's own folder: n123123123/file.JPEG.
 2. Get the 2012 validation archive and bounding boxes from ImageNet.
 3. Use the bounding box xml file and to classify files from the validation archive and then put them into a folder structure like above.
+
+For more information on how to download and process the full ImageNet dataset, see [Downloading, preprocessing, and uploading the ImageNet dataset](https://cloud.google.com/tpu/docs/imagenet-setup)
 
 # Running the model
 
