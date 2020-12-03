@@ -22,8 +22,9 @@ Every TPU will get a node from the instance group, so the instance group will ha
 
 ```
 imagenet/train/nXXXXXX/file.jpg
-imagenet/validate/nXXXXXX/file.jpg
+imagenet/val/nXXXXXX/file.jpg
 ```
+For more information on how to download and process the full ImageNet dataset, see [Downloading, preprocessing, and uploading the ImageNet dataset](https://cloud.google.com/tpu/docs/imagenet-setup)
 
 > #### TODO: add more about dataprep here.
 
