@@ -8,29 +8,35 @@ from PIL import Image
 from google.cloud.storage.client import Client
 from google.cloud.storage.blob import Blob
 from torchvision.datasets.vision import VisionDataset
-from typing import Any, Callable, cast, Dict, List, Optional, Tuple
+from typing import Any, Callable, cast, Dict, List, Optional, Tuple, Union
 import torchvision
 import torchvision.transforms as transforms
 import torch_xla.utils.gcsfs
 
-client = Client()
+_client = None
+def get_client():
+    global _client
+    if _client is None:
+        _client = Client()
+    return _client
+
 def make_dataset(
         directory: str,
-        classes_to_idx: Dict[str, int],
-        extensions: Optional[Tuple[str, ...]]
+        classes_to_idx: Dict[bytes, int],
+        extensions: Optional[Tuple[str, ...]]=None
 ) -> List[Tuple[str, int]]:
     """
     Map folder+classnames into list of (imagepath, class_index). Requires potentially expensive glob of
     virtual filesystem. For large object store datasets it's recommended to cache this.
     """
     # note: relying on private api to avoid some extra stat calls.
-    paths = torch_xla._XLAC._xla_tffs_list(os.path.join(directory, "*", "*.JPEG"))
+    paths = torch_xla._XLAC._xla_tffs_list(os.path.join(directory, "*", "*.JPEG")) # pytype: disable=module-attr
     instances = []
     classes = set(classes_to_idx.keys())
     if extensions is None:
         extensions = ()
     # make it easier to directly match on result of str.split
-    extSet = set(ext[1:] for ext in extensions)
+    extSet = set(ext[1:].lower() for ext in extensions)
     for path in paths:
         components = path.split('/')
         # based on above glob expression the last 2 components are filename/class
@@ -43,21 +49,19 @@ def make_dataset(
         instances.append((path, classes_to_idx[potentialclass]))
     return instances
 
-class VFSImageFolder(VisionDataset):
+class ImageFolder(VisionDataset):
     def __init__(
             self,
             root: str,
             synset_path: str,
+            synset_loader: Optional[Callable[[str], bytes]] = torch_xla.utils.gcsfs.read,
             index_path: Optional[str] = None,
-            class_to_fname: Optional[Dict[str, List[str]]] = None,
             extensions: Optional[Tuple[str, ...]] = None,
             transform: Optional[Callable] = None,
             target_transform: Optional[Callable] = None,
             is_valid_file: Optional[Callable[[str], bool]] = None,
 ) -> None:
-      if not root.startswith("gs://"):
-        raise Exception("require gs:// uris, got {}".format(root))
-      super(VFSImageFolder, self).__init__(root, transform=transform,
+      super(ImageFolder, self).__init__(root, transform=transform,
                                           target_transform=target_transform)
       classes, class_to_idx = self._find_classes(synset_path)
       load_from_cache = True
@@ -65,14 +69,14 @@ class VFSImageFolder(VisionDataset):
       if index_path is not None:
           f = io.BytesIO()
           try:
-              client.download_blob_to_file(index_path, f)
+              get_client().download_blob_to_file(index_path, f)
               f.seek(0)
               samples = json.loads(f.read())
           except Exception as e:
               print(e)
       if samples is None:         
           load_from_cache = False
-          samples = make_dataset(self.root, class_to_idx, torchvision.datasets.folder.IMG_EXTENSIONS)              
+          samples = make_dataset(self.root, class_to_idx, torchvision.datasets.folder.IMG_EXTENSIONS)  # pytype: disable=module-attr
       if len(samples) == 0:          
         msg = "Found 0 files in subfolders of: {}\n".format(self.root)
         if extensions is not None:
@@ -84,20 +88,29 @@ class VFSImageFolder(VisionDataset):
       self.samples = samples
       self.targets = [s[1] for s in samples]
       self.imgs = self.samples
-      if not load_from_cache:
+      if index_path is not None and not load_from_cache:
           self._cache_index(index_path)
 
-    def loader(self, uri):    
-      f = io.BytesIO()
-      client.download_blob_to_file(uri, f)
+    def loader(self, uri):
+      f = self._buf
+      f.seek(0)
+      if uri.startswith("gs://"):
+          get_client().download_blob_to_file(uri, f)
+      else:
+          with open(uri, "rb") as handle:
+              f.write(handle.read())
       img = Image.open(f).convert('RGB')
       return img
-    def _find_classes(self, synset_path: str) -> Tuple[List[str], Dict[str, int]]:
+    def _find_classes(self, synset_path: str) -> Tuple[List[bytes], Dict[bytes, int]]:
       # Read categories from file.        
       classes = []
-      # slight overhead in stat + read, but it's a one-time call.
-      
-      for cls in torch_xla.utils.gcsfs.read(synset_path).split(b'\n'):
+      # Small hack to differentiate between gcs and local paths
+      if synset_path.startswith("gs://"):
+          data = torch_xla.utils.gcsfs.read(synset_path)
+      else:
+          with open(synset_path, "rb") as f:
+              data=f.read()
+      for cls in data.split(b'\n'):
           cls = cls.strip()
           if cls == '':
               continue
@@ -110,7 +123,7 @@ class VFSImageFolder(VisionDataset):
         # upload_
         blob = Blob.from_string(fname)
         # There seems to be a bug in upload_from_string not using client properly
-        blob.bucket._client = client
+        blob.bucket._client = get_client()
         blob.upload_from_string(json.dumps(self.samples))
     def __len__(self):
       return len(self.samples)
@@ -131,7 +144,7 @@ if __name__ == "__main__":
     if 'IMAGE_DIR' not in os.environ:
         raise Exception("IMAGE_DIR env variable is required")
     directory=os.environ['IMAGE_DIR']
-    train_dataset = VFSImageFolder(
+    train_dataset = ImageFolder(
         root=directory+"/train",
         synset_path=directory+"/synset_labels.txt",
         index_path=directory+'/imagenetindex.json',
@@ -142,7 +155,7 @@ if __name__ == "__main__":
             normalize,
         ]))
     resize_dim = max(img_dim, 256)
-    val_dataset = VFSImageFolder(
+    val_dataset = ImageFolder(
         root=directory+"/val",
         synset_path=directory+"/synset_labels.txt",
         index_path=directory+'/imagenetindex_val.json',

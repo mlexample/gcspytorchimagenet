@@ -1,5 +1,8 @@
 import sys
-sys.path.insert(0, '/usr/share/torch-xla-1.7/pytorch/xla/test')
+import os
+for extra in ('/usr/share/torch-xla-1.7/pytorch/xla/test', '/pytorch/xla/test'):
+  if os.path.exists(extra):
+    sys.path.insert(0, extra)
 
 import args_parse
 import gcsdataset
@@ -235,7 +238,7 @@ def train_imagenet():
       if step % FLAGS.log_steps == 0:
         xm.add_step_closure(
             test_utils.print_test_update, args=(device, None, epoch, step))
-    accuracy_replica = 100.0 * correct.item() / total_samples
+    accuracy_replica = 100.0 * correct.item() / total_samples  # pytype: disable=attribute-error
     accuracy = xm.mesh_reduce('test_accuracy', accuracy_replica, np.mean)
     return accuracy, accuracy_replica
 

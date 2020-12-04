@@ -3,6 +3,7 @@
 \#*\#
 # python
 *pyc
+.pytype
 # Local .terraform directories
 **/.terraform/*
 
