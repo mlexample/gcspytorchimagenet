@@ -86,11 +86,9 @@ class VFSImageFolder(VisionDataset):
       self.imgs = self.samples
       if not load_from_cache:
           self._cache_index(index_path)
-      self._buf = io.BytesIO()
 
     def loader(self, uri):    
-      f = self._buf
-      f.seek(0)
+      f = io.BytesIO()
       client.download_blob_to_file(uri, f)
       img = Image.open(f).convert('RGB')
       return img
