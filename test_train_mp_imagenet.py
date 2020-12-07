@@ -128,7 +128,7 @@ def train_imagenet():
   else:
     normalize = transforms.Normalize(
         mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    train_dataset = gcsdataset.ImageFolder(
+    train_dataset = gcsdataset.VFSImageFolder(
         root=os.path.join(FLAGS.datadir, 'train'),
         index_path=os.path.join(FLAGS.datadir, 'imagenetindex.json'),
         synset_path=os.path.join(FLAGS.datadir, 'synset_labels.txt'),
@@ -142,7 +142,7 @@ def train_imagenet():
     train_dataset_len = len(train_dataset.imgs)
     assert train_dataset_len > 0
     resize_dim = max(img_dim, 256)
-    test_dataset = gcsdataset.ImageFolder(
+    test_dataset = gcsdataset.VFSImageFolder(
         os.path.join(FLAGS.datadir, 'val'),
         index_path=os.path.join(FLAGS.datadir, 'imagenetindex_val.json'),
         synset_path=os.path.join(FLAGS.datadir, 'synset_labels.txt'),
