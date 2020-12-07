@@ -148,8 +148,8 @@ if __name__ == "__main__":
         index_path=directory+'/imagenetindex_val.json',
         transform=transforms.Compose([
             transforms.Resize(resize_dim),
-            transforms.CenterCrop(),
-            transforms.ToTensor(img_dim),
+            transforms.CenterCrop(img_dim),
+            transforms.ToTensor(),
             normalize,
         ]))
     if len(sys.argv) == 2 and sys.argv[1] == 'cache':
