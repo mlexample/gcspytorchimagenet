@@ -141,14 +141,15 @@ if __name__ == "__main__":
             transforms.ToTensor(),
             normalize,
         ]))
+    resize_dim = max(img_dim, 256)
     val_dataset = VFSImageFolder(
         root=directory+"/val",
         synset_path=directory+"/synset_labels.txt",
         index_path=directory+'/imagenetindex_val.json',
         transform=transforms.Compose([
-            transforms.RandomResizedCrop(img_dim),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
+            transforms.Resize(resize_dim),
+            transforms.CenterCrop(),
+            transforms.ToTensor(img_dim),
             normalize,
         ]))
     if len(sys.argv) == 2 and sys.argv[1] == 'cache':
