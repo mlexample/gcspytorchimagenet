@@ -37,7 +37,7 @@ def make_dataset(
         extensions = ()
     # make it easier to directly match on result of str.split
     extSet = set(ext[1:].lower() for ext in extensions)
-    for path in paths:
+    for path in sorted(paths):
         components = path.split('/')
         # based on above glob expression the last 2 components are filename/class
         potentialclass = components[-2].encode('utf-8')
@@ -49,6 +49,15 @@ def make_dataset(
         instances.append((path, classes_to_idx[potentialclass]))
     return instances
 
+def write_bytes(path: str, data: str):
+    with open(path, 'w') as f:
+        f.write(data)
+def gcs_write_bytes(path: str, data: str):
+    # skip caching if local
+    blob = Blob.from_string(path)
+    # There seems to be a bug in upload_from_string not using client properly
+    blob.bucket._client = get_client()
+    blob.upload_from_string(data)
 class ImageFolder(VisionDataset):
     def __init__(
             self,
@@ -60,12 +69,19 @@ class ImageFolder(VisionDataset):
             transform: Optional[Callable] = None,
             target_transform: Optional[Callable] = None,
             is_valid_file: Optional[Callable[[str], bool]] = None,
+            write_cb: Optional[Callable[[str,str], None]] = None,
 ) -> None:
       super(ImageFolder, self).__init__(root, transform=transform,
                                           target_transform=target_transform)
       classes, class_to_idx = self._find_classes(synset_path)
       load_from_cache = True
       samples = None
+      if write_cb is None and index_path is not None:
+          if "gs://" in index_path:
+              write_cb = gcs_write_bytes
+          else:
+              write_cb = write_bytes
+      self.write_cb = write_cb
       if index_path is not None:
           f = io.BytesIO()
           try:
@@ -120,11 +136,7 @@ class ImageFolder(VisionDataset):
       class_to_idx = {cls_name: i for i, cls_name in enumerate(classes)}
       return classes, class_to_idx
     def _cache_index(self, fname: str) -> None:
-        # upload_
-        blob = Blob.from_string(fname)
-        # There seems to be a bug in upload_from_string not using client properly
-        blob.bucket._client = get_client()
-        blob.upload_from_string(json.dumps(self.samples))
+        self.write_cb(fname, json.dumps(self.samples))
     def __len__(self):
       return len(self.samples)
     def __getitem__(self, index: int) -> Tuple[Any, Any]:

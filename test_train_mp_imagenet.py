@@ -214,7 +214,11 @@ def train_imagenet():
   def train_loop_fn(loader, epoch):
     tracker = xm.RateTracker()
     model.train()
+    iters=0
     for step, (data, target) in enumerate(loader):
+      iters+=1
+      if step % 1000 == 0:
+          print("Step {}".format(step))
       optimizer.zero_grad()
       output = model(data)
       loss = loss_fn(output, target)
@@ -226,6 +230,7 @@ def train_imagenet():
       if step % FLAGS.log_steps == 0:
         xm.add_step_closure(
             _train_update, args=(device, step, loss, tracker, epoch, writer))
+    print("Iterated {} items".format(iters))
 
   def test_loop_fn(loader, epoch):
     total_samples, correct = 0, 0

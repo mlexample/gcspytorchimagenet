@@ -58,7 +58,7 @@ resource "google_compute_instance_group_manager" "instance_group_manager" {
   name               = "tpupod-instance-group"
   base_instance_name = "tpupod"
   zone               = var.zone
-  target_size        = 4 # 32/8
+  target_size        = 1 # 32/8
   version {
     instance_template = google_compute_instance_template.default.id
   }
@@ -128,7 +128,7 @@ resource "google_compute_firewall" "tensorboard" {
 resource "google_tpu_node" "tpu" {
   name               = "mytpu"
   zone               = var.zone
-  accelerator_type   = "v2-32"
+  accelerator_type   = "v3-8"
   tensorflow_version = "pytorch-1.7"
 }
 
