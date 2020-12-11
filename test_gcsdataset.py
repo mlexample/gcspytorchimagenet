@@ -51,5 +51,9 @@ class TestImageFolder(unittest.TestCase):
         vals = list(ds)
         self.assertEqual(len(vals), self.count, "Expected {} items got {}".format(self.count, len(vals)))
 
+class TestTrainScript(unittest.TestCase):
+    def test_import_train_script(self):
+        import test_train_mp_imagenet
+            
 if __name__ == '__main__':
     unittest.main()

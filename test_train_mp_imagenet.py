@@ -31,6 +31,11 @@ MODEL_OPTS = {
     '--lr_scheduler_divisor': {
         'type': int,
     },
+    '--dataset':{
+      'choices':['gcsdataset', 'torchdataset'],
+      'default':'gcsdataset',
+      'type': str,
+    },
 }
 
 FLAGS = args_parse.parse_common_options(
@@ -131,34 +136,29 @@ def train_imagenet():
   else:
     normalize = transforms.Normalize(
         mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    train_dataset = gcsdataset.VFSImageFolder(
-        root=os.path.join(FLAGS.datadir, 'train'),
-        index_path=os.path.join(FLAGS.datadir, 'imagenetindex.json'),
-        synset_path=os.path.join(FLAGS.datadir, 'synset_labels.txt'),
-        transform=transforms.Compose([
-            transforms.RandomResizedCrop(img_dim),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            normalize,
-#            transforms.Lambda(lambda val: val.numpy()),
-        ]))
-    train_dataset_len = len(train_dataset.imgs)
-    assert train_dataset_len > 0
-    resize_dim = max(img_dim, 256)
-    test_dataset = gcsdataset.VFSImageFolder(
+    transform = transforms.Compose([
+      transforms.RandomResizedCrop(img_dim),
+      transforms.RandomHorizontalFlip(),
+      transforms.ToTensor(),
+      normalize,
+      #            transforms.Lambda(lambda val: val.numpy()),
+    ])
+    if FLAGS.dataset == 'gcsdataset':
+      train_dataset = gcsdataset.ImageFolder(
         os.path.join(FLAGS.datadir, 'val'),
         index_path=os.path.join(FLAGS.datadir, 'imagenetindex_val.json'),
         synset_path=os.path.join(FLAGS.datadir, 'synset_labels.txt'),
         # Matches Torchvision's eval transforms except Torchvision uses size
         # 256 resize for all models both here and in the train loader. Their
         # version crashes during training on 299x299 images, e.g. inception.
-        transform=transforms.Compose([
-            transforms.Resize(resize_dim),
-            transforms.CenterCrop(img_dim),
-            transforms.ToTensor(),
-            normalize,
-#            transforms.Lambda(lambda val: val.numpy()),
-        ]))
+        transform=transform)
+    else:
+      test_dataset = torchvision.datasets.ImageFolder( # pytype: disable=module-attr
+        os.path.join(FLAGS.datadir, 'val'),
+        # Matches Torchvision's eval transforms except Torchvision uses size
+        # 256 resize for all models both here and in the train loader. Their
+        # version crashes during training on 299x299 images, e.g. inception.
+        transform)
     assert len(test_dataset) > 0
     train_sampler, test_sampler = None, None
     if xm.xrt_world_size() > 1:

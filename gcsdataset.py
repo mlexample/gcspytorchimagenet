@@ -106,6 +106,7 @@ class ImageFolder(VisionDataset):
       self.imgs = self.samples
       if index_path is not None and not load_from_cache:
           self._cache_index(index_path)
+      self._buf = io.BytesIO()
 
     def loader(self, uri):
       f = self._buf
