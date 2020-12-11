@@ -136,9 +136,10 @@ def train_imagenet():
   else:
     normalize = transforms.Normalize(
         mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    resize_dim = max(img_dim, 256)
     transform = transforms.Compose([
-      transforms.RandomResizedCrop(img_dim),
-      transforms.RandomHorizontalFlip(),
+      transforms.Resize(resize_dim),
+      transforms.CenterCrop(img_dim),
       transforms.ToTensor(),
       normalize,
       #            transforms.Lambda(lambda val: val.numpy()),
