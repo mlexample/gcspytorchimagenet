@@ -148,7 +148,6 @@ def train_imagenet():
       train_dataset = gcsdataset.ImageFolder(
         os.path.join(FLAGS.datadir, 'val'),
         index_path=os.path.join(FLAGS.datadir, 'imagenetindex_val.json'),
-        synset_path=os.path.join(FLAGS.datadir, 'synset_labels.txt'),
         # Matches Torchvision's eval transforms except Torchvision uses size
         # 256 resize for all models both here and in the train loader. Their
         # version crashes during training on 299x299 images, e.g. inception.

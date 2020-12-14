@@ -24,7 +24,7 @@ class TestGCSDataset(unittest.TestCase):
     def tearDown(self):
         self.directory.cleanup()
     def test_make_dataset(self):
-        ds = gcsdataset.make_dataset(directory=self.directory.name, classes_to_idx=self.classes_to_idx, extensions=(".JPEG",))
+        ds = gcsdataset.make_dataset(directory=self.directory.name, extensions=(".JPEG",))
         self.assertEqual(len(ds), self.count, "Expected {} items got {}".format(self.count, len(ds)))
 
 
@@ -47,7 +47,7 @@ class TestImageFolder(unittest.TestCase):
         synset_path = os.path.join(self.directory.name, "synset_labels")
         with open(synset_path, "w") as f:
             f.write('a\nb\n')
-        ds = gcsdataset.ImageFolder(root=self.directory.name, synset_path=synset_path)
+        ds = gcsdataset.ImageFolder(root=self.directory.name)
         vals = list(ds)
         self.assertEqual(len(vals), self.count, "Expected {} items got {}".format(self.count, len(vals)))
 
