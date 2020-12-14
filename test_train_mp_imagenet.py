@@ -161,7 +161,8 @@ def train_imagenet():
             transforms.ToTensor(),
             normalize,
         ]))
-    assert len(train_dataset) > 0
+    train_dataset_len = len(train_dataset)
+    assert train_dataset_len > 0
     transform = transforms.Compose([
       transforms.Resize(resize_dim),
       transforms.CenterCrop(img_dim),
