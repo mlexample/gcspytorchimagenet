@@ -2,12 +2,14 @@
 
 Disclaimer: this code is provided for example purposes only.
 
+
+![TPU pod training architectural diagram](images/gcp.png)
 This repo contains supporting files for training with the following configuration:
 
 ## Cloud TPU Pod
 
 TPU Pods are broken up into several slices. Each slice needs to be paired with a VM worker (asynchronous training). A v2-32 TPU Pod has 4 slices (32/8=4).
-When training happens each vm will get a dedicated slice.
+When training happens each vm will get a dedicated pod slice.
 
 The XLA compiler performs code transformations, including tiling a matrix multiply into smaller blocks, to efficiently execute computations on the matrix unit (MXU).
 The structure of the MXU hardware, a 128x128 systolic array, and the design of TPU's memory subsystem, which prefers dimensions that are multiples of 8, are used by the XLA compiler for tiling efficiency.
@@ -29,16 +31,16 @@ imagenet/val/nXXXXXX/file.jpg
 
 Getting the data in-place is out of scope for now. For a quick overview:
 
-1. Get the 2012 training archive and unpack into files that look like n1231231.tar. Each of those neeeds to ne unpacked into it's own folder: n123123123/file.JPEG.
-2. Get the 2012 validation archive and bounding boxes from ImageNet.
-3. Use the bounding box xml file and to classify files from the validation archive and then put them into a folder structure like above.
+1. Get the 2012 training archive and unpack into files that look like n1231231.tar. Each of those neeeds to be unpacked into it's own folder: n123123123/file.JPEG.
+2. Get the 2012 validation archive and bounding boxes from ImageNet (2012 data).
+3. Use the bounding box xml file and to classify files from the validation archive and then put them into a folder structure like above. In our case we used the first bounding box in the XML file for the image. This will require some scripting.
 
 For more information on how to download and process the full ImageNet dataset, see [Downloading, preprocessing, and uploading the ImageNet dataset](https://cloud.google.com/tpu/docs/imagenet-setup)
 
 # Running the model
 
 Create a cloud project if necessary, or re-use an existing on. Either way identify the project id because you will use it in later steps.
-From console: Create the initial required monitoring workspace. This will take a minute and is required for terraform dashboard creation to succeed. Ensure that you replace "your-project-id"
+From console: Create the initial required monitoring workspace. This simply requires visiting the below stackdriver url. This will take a minute and is required for terraform dashboard creation to succeed. Ensure that you replace "your-project-id"
 with the cloud project.
 
 ```
