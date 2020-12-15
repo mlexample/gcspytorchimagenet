@@ -12,14 +12,16 @@ import torch.nn.functional as F
 import torch.nn as nn
 import torch
 import numpy as np
-import schedulers
-import gcsdataset
-import args_parse
 import sys
 import os
+
 for extra in ('/usr/share/torch-xla-1.7/pytorch/xla/test', '/pytorch/xla/test'):
     if os.path.exists(extra):
         sys.path.insert(0, extra)
+
+import schedulers
+import gcsdataset
+import args_parse
 
 
 SUPPORTED_MODELS = [
@@ -260,8 +262,8 @@ def train_imagenet():
             if step % FLAGS.log_steps == 0:
                 xm.add_step_closure(
                     test_utils.print_test_update, args=(device, None, epoch, step))
-        # pytype: disable=attribute-error
-        accuracy_replica = 100.0 * correct.item() / total_samples
+        correct_val = correct.item() # pytype: disable=attribute-error
+        accuracy_replica = 100.0 * correct_val / total_samples
         accuracy = xm.mesh_reduce('test_accuracy', accuracy_replica, np.mean)
         return accuracy, accuracy_replica
 

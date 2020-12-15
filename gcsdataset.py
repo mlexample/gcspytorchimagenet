@@ -126,8 +126,10 @@ class ImageFolder(VisionDataset):
         if paths is None:
             load_from_cache = False
             # note: relying on private api to avoid some extra stat calls.
-            paths = list(torch_xla._XLAC._xla_tffs_list(os.path.join(  # pylint: disable=protected-access
-                self.root, "*", "*.JPEG")))  # pytype: disable=module-attr
+            #pylint: disable-protected-access
+            ls = torch_xla._XLAC._xla_tffs_list # pytype: disable=module-attr
+            #pylint: enable-protected-access
+            paths = list(ls(os.path.join(self.root, "*", "*.JPEG")))
             paths.sort()
         samples, classes_to_idx = make_dataset(
             paths,
