@@ -1,50 +1,54 @@
+"""
+gcsdataset provides a torchvision-like ImageFolder dataset that works on
+regular files as well as google cloud storage. It also supports caching for
+expensive recursive metdata operations.
+"""
 import io
 import json
 import os
-import time
-import tempfile
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from PIL import Image
-from google.cloud.storage.client import Client
 from google.cloud.storage.blob import Blob
+from google.cloud.storage.client import Client
+from PIL import Image
+
 from torchvision.datasets.vision import VisionDataset
-from typing import Any, Callable, cast, Dict, List, Optional, Tuple, Union
+
 import torchvision
 import torchvision.transforms as transforms
 import torch_xla.utils.gcsfs
 
-_client = None
+_CLIENT = None
 
 
-def get_client():
-    global _client
-    if _client is None:
-        _client = Client()
-    return _client
+def _get_client():
+    global _CLIENT
+    if _CLIENT is None:
+        _CLIENT = Client()
+    return _CLIENT
 
 
 def make_dataset(
-        directory: str,
         paths: List[str],
         extensions: Optional[Tuple[str, ...]] = None,
 ) -> Tuple[List[Tuple[str, int]], Dict[bytes, int]]:
     """
-    Map folder+classnames into list of (imagepath, class_index). Requires potentially expensive glob of
-    virtual filesystem. For large object store datasets it's recommended to cache this.
+    Map folder+classnames into list of (imagepath, class_index). Requires potentially
+    expensive glob filesystem. For large object store datasets it's recommended to cache this.
     """
     instances = []
     counter = 0
     if extensions is None:
         extensions = ()
     # make it easier to directly match on result of str.split
-    extSet = set(ext[1:].lower() for ext in extensions)
+    ext_set = set(ext[1:].lower() for ext in extensions)
     classes_to_idx = {}
     for path in sorted(paths):
         components = path.split('/')
         # based on above glob expression the last 2 components are filename/class
         potentialclass = components[-2].encode('utf-8')
         fname = components[-1]
-        if fname.split('.')[-1].lower() not in extSet:
+        if fname.split('.')[-1].lower() not in ext_set:
             continue
         if potentialclass not in classes_to_idx:
             classes_to_idx[potentialclass] = counter
@@ -53,50 +57,55 @@ def make_dataset(
     return instances, classes_to_idx
 
 
-def write_bytes(path: str, data: str):
-    with open(path, 'w') as f:
-        f.write(data)
+def _write_bytes(path: str, data: str):
+    with open(path, 'w') as handle:
+        handle.write(data)
 
 
-def read_bytes(path: str):
+def _read_bytes(path: str):
     try:
-        with open(path, 'rb') as f:
-            return f.read()
+        with open(path, 'rb') as handle:
+            return handle.read()
     except FileNotFoundError:
         raise NotFoundException()
 
 
-def gcs_write_bytes(path: str, data: str):
+def _gcs_write_bytes(path: str, data: str):
     # skip caching if local
     blob = Blob.from_string(path)
     # There seems to be a bug in upload_from_string not using client properly
-    blob.bucket._client = get_client()
+    blob.bucket._client = _get_client()  # pylint: disable=protected-access
     blob.upload_from_string(data)
 
 
-def gcs_read_bytes(path: str):
+def _gcs_read_bytes(path: str):
     try:
-        f = io.BytesIO()
-        get_client().download_blob_to_file(path, f)
-        f.seek(0)
-        return f.read()
-    except Exception:  # TODO narrow this
+        buf = io.BytesIO()
+        _get_client().download_blob_to_file(path, buf)
+        buf.seek(0)
+        return buf.read()
+    except Exception:
         raise NotFoundException()
 
 
 class NotFoundException(Exception):
-    pass
+    """
+    Thrown when a filesystem or gcs resource isn't found.
+    """
 
 
 class ImageFolder(VisionDataset):
+    """
+    ImageFolder is a work-alike of the torchvision ImageFolder class supporting gcs.
+    """
+
     def __init__(
-        self,
-        root: str,
-        index_path: Optional[str] = None,
-        extensions: Optional[Tuple[str, ...]] = None,
-        transform: Optional[Callable] = None,
-        target_transform: Optional[Callable] = None,
-        is_valid_file: Optional[Callable[[str], bool]] = None,
+            self,
+            root: str,
+            index_path: Optional[str] = None,
+            extensions: Optional[Tuple[str, ...]] = None,
+            transform: Optional[Callable] = None,
+            target_transform: Optional[Callable] = None,
     ) -> None:
         super(ImageFolder, self).__init__(root, transform=transform,
                                           target_transform=target_transform)
@@ -104,11 +113,11 @@ class ImageFolder(VisionDataset):
         load_from_cache = True
         samples = None
         paths = None
-        self.write_cb = write_bytes
-        self.read_cb = read_bytes
+        self.write_cb = _write_bytes
+        self.read_cb = _read_bytes
         if index_path is not None and "gs://" in index_path:
-            self.write_cb = gcs_write_bytes
-            self.read_cb = gcs_read_bytes
+            self.write_cb = _gcs_write_bytes
+            self.read_cb = _gcs_read_bytes
         if index_path is not None:
             try:
                 paths = json.loads(self.read_cb(index_path))
@@ -117,12 +126,13 @@ class ImageFolder(VisionDataset):
         if paths is None:
             load_from_cache = False
             # note: relying on private api to avoid some extra stat calls.
-            paths = list(torch_xla._XLAC._xla_tffs_list(os.path.join(
+            paths = list(torch_xla._XLAC._xla_tffs_list(os.path.join(  # pylint: disable=protected-access
                 self.root, "*", "*.JPEG")))  # pytype: disable=module-attr
             paths.sort()
         samples, classes_to_idx = make_dataset(
-            self.root, paths, torchvision.datasets.folder.IMG_EXTENSIONS)  # pytype: disable=module-attr
-
+            paths,
+            torchvision.datasets.folder.IMG_EXTENSIONS)  # pytype: disable=module-attr
+        # pylint: disable=len-as-condition
         if len(samples) == 0:
             msg = "Found 0 files in subfolders of: {}\n".format(self.root)
             if extensions is not None:
@@ -141,10 +151,14 @@ class ImageFolder(VisionDataset):
         self._buf = io.BytesIO()
 
     def loader(self, uri):
-        f = self._buf
-        f.seek(0)
-        f.write(self.read_cb(uri))
-        img = Image.open(f).convert('RGB')
+        """
+        Loader will attempt to read contents of uri (only regular file paths and gs:// urls
+        are supported. It returns a PIL Image object.
+        """
+        buf = self._buf
+        buf.seek(0)
+        buf.write(self.read_cb(uri))
+        img = Image.open(buf).convert('RGB')
         return img
 
     def _cache_index(self, fname: str, paths: List[str]) -> None:
@@ -163,7 +177,7 @@ class ImageFolder(VisionDataset):
         return sample, target
 
 
-if __name__ == "__main__":
+def _main():
     import sys
     normalize = transforms.Normalize(
         mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
@@ -193,18 +207,9 @@ if __name__ == "__main__":
     if len(sys.argv) == 2 and sys.argv[1] == 'cache':
         # Just ensure data is cached
         sys.exit(0)
-    # proceed with regular training
-    # Simulate training ops by doing a quick test
     assert len(train_dataset) > 0
     assert len(val_dataset) > 0
-    # benchmark
 
-    for dataset in (train_dataset, val_dataset):
-        t0 = time.time()
-        print("Begin load of 100 samples")
-        print(dataset[0])
-        for i in range(0, 100):
-            sample = dataset[i]
-            if i % 100 == 0:
-                avg = (i+1)/(time.time()-t0)
-                print("Loaded {} samples. Average {} samples/s".format((i+1), avg))
+
+if __name__ == "__main__":
+    _main()

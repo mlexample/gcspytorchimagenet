@@ -32,7 +32,7 @@ class TestGCSDataset(unittest.TestCase):
 
     def test_make_dataset(self):
         ds = gcsdataset.make_dataset(
-            self.directory.name, self.paths, extensions=(".JPEG",))
+            self.paths, extensions=(".JPEG",))
         self.assertEqual(len(ds), self.count,
                          "Expected {} items got {}".format(self.count, len(ds)))
 
