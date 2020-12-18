@@ -249,7 +249,6 @@ def train_imagenet():
             if step % FLAGS.log_steps == 0:
                 xm.add_step_closure(
                     _train_update, args=(device, step, loss, tracker, epoch, writer))
-        print("Iterated {} items".format(iters))
 
     def test_loop_fn(loader, epoch):
         total_samples, correct = 0, 0

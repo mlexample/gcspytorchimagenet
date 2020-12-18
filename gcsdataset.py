@@ -189,7 +189,7 @@ def _main():
     directory = os.environ['IMAGE_DIR']
     train_dataset = ImageFolder(
         root=directory+"/train",
-        index_path=directory+'/imagenetindex.json',
+        index_path=directory+'/imagenetindex_train.json',
         transform=transforms.Compose([
             transforms.RandomResizedCrop(img_dim),
             transforms.RandomHorizontalFlip(),
