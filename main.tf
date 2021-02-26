@@ -28,7 +28,7 @@ resource "google_compute_instance_template" "default" {
 
   // Create a new boot disk from an image
   disk {
-    source_image = "projects/ml-images/global/images/debian-9-torch-xla-v20201029"
+    source_image = "projects/ml-images/global/images/debian-9-torch-xla-v20210226"
     auto_delete  = true
     boot         = true
     disk_size_gb = "100"
