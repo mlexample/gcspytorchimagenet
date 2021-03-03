@@ -4,6 +4,11 @@ curl -sSO https://dl.google.com/cloudagents/install-monitoring-agent.sh
 bash install-monitoring-agent.sh # for memory usage in dashboard
 apt install -y linux-perf-4.9 emacs-nox # for perf top
 
+source /anaconda3/etc/profile.d/conda.sh
+conda activate torch-xla-1.7
+pip install petastorm
+pip install gcsfs
+
 gsutil cp gs://${BUCKET}/thepackage.tar.gz .
 tar xf thepackage.tar.gz
 # vars are unused

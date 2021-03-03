@@ -197,14 +197,16 @@ def train_imagenet():
             sampler=train_sampler,
             drop_last=FLAGS.drop_last,
             shuffle=False if train_sampler else True,
-            num_workers=FLAGS.num_workers)
+            num_workers=FLAGS.num_workers,
+            prefetch_factor=2)
         test_loader = torch.utils.data.DataLoader(
             test_dataset,
             batch_size=FLAGS.test_set_batch_size,
             sampler=test_sampler,
             drop_last=FLAGS.drop_last,
             shuffle=False,
-            num_workers=FLAGS.num_workers)
+            num_workers=FLAGS.num_workers,
+            prefetch_factor=2)
 
     torch.manual_seed(42)
 

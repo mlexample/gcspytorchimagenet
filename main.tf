@@ -26,9 +26,9 @@ resource "google_compute_instance_template" "default" {
     on_host_maintenance = "MIGRATE"
   }
 
-  // Create a new boot disk from an image
+  // Create a new boot disk from an image (debian-9-torch-xla-v20201029)
   disk {
-    source_image = "projects/ml-images/global/images/debian-9-torch-xla-v20201029"
+    source_image = "projects/ml-images/global/images/debian-9-torch-xla-v20210216"
     auto_delete  = true
     boot         = true
     disk_size_gb = "100"
@@ -128,7 +128,7 @@ resource "google_compute_firewall" "tensorboard" {
 resource "google_tpu_node" "tpu" {
   name               = "mytpu"
   zone               = var.zone
-  accelerator_type   = "v2-32"
+  accelerator_type   = "v3-32"
   tensorflow_version = "pytorch-1.7"
 }
 
