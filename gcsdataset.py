@@ -20,6 +20,14 @@ import torch_xla.utils.gcsfs
 
 _CLIENT = None
 
+class SizedDataLoader(object):
+    def __init__(self, loader, size):
+        self.loader = loader
+        self.size = size
+    def __iter__(self):
+        return iter(self.loader)
+    def __len__(self):
+        return self.size
 
 def _get_client():
     global _CLIENT

@@ -23,7 +23,7 @@ for extra in ('/usr/share/torch-xla-1.7/pytorch/xla/test', '/pytorch/xla/test'):
         sys.path.insert(0, extra)
 
 import schedulers
-# import gcsdataset
+import gcsdataset
 import args_parse
 
 SUPPORTED_MODELS = [
@@ -130,7 +130,8 @@ img_dim = get_model_property('img_dim')
 normalize = transforms.Normalize(
     mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 
-transform = transforms.Compose([
+transform =  transforms.Compose([
+    transforms.ToPILImage(),
     transforms.RandomResizedCrop(img_dim),
     transforms.RandomHorizontalFlip(),
     transforms.ToTensor(),
@@ -144,7 +145,7 @@ def _transform_row(parq_row):
         }
     return result_row
 
-transform = TransformSpec(_transform_row, removed_fields=['text'])
+transform_spec = TransformSpec(_transform_row, removed_fields=['text'])
 
 # def train_dataloader():
 #     reader = make_reader(dataset_url=os.path.join(FLAGS.datadir, 'train/train'), reader_pool_type='thread', workers_count=10, 
@@ -174,11 +175,11 @@ def train_imagenet():
                                           shuffle_row_groups=True, shuffle_row_drop_partitions=1,
                                           num_epochs=None,
                                           cur_shard=xm.get_ordinal(), shard_count=xm.xrt_world_size(),
-                                          transform_spec=transform),
+                                          transform_spec=transform_spec),
                                           batch_size=FLAGS.batch_size, shuffling_queue_capacity=4096)
 
     test_loader = DataLoader(make_reader(dataset_url=os.path.join(FLAGS.datadir, 'val/val'),
-                                         num_epochs=1, shuffle_row_groups=False, transform_spec=transform),
+                                         num_epochs=1, shuffle_row_groups=False, transform_spec=transform_spec),
                                          batch_size=FLAGS.test_set_batch_size)
     
     torch.manual_seed(42)
@@ -217,7 +218,8 @@ def train_imagenet():
             data, target = row['image'], row['noun_id']
             optimizer.zero_grad()
             output = model(data)
-            loss = loss_fn(output, target)
+            print(type(output), type(target))
+            loss = loss_fn(output, target) # either output or target is a list, not a ? with a .size method()
             loss.backward()
             xm.optimizer_step(optimizer)
             tracker.add(FLAGS.batch_size)
@@ -245,8 +247,8 @@ def train_imagenet():
         accuracy = xm.mesh_reduce('test_accuracy', accuracy_replica, np.mean)
         return accuracy, accuracy_replica
 
-    train_device_loader = pl.MpDeviceLoader(train_loader, device)
-    test_device_loader = pl.MpDeviceLoader(test_loader, device)
+    train_device_loader = pl.MpDeviceLoader(gcsdataset.SizedDataLoader(train_loader, train_size), device)
+    test_device_loader = pl.MpDeviceLoader(gcsdataset.SizedDataLoader(test_loader, test_size), device)
     accuracy, max_accuracy = 0.0, 0.0
     for epoch in range(1, FLAGS.num_epochs + 1):
         xm.master_print('Epoch {} train begin {}'.format(
