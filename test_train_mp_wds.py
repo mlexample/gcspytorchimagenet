@@ -21,7 +21,7 @@ import time
 # warnings.filterwarnings("ignore")
 from itertools import islice
 
-for extra in ('/usr/share/torch-xla-1.7/pytorch/xla/test', '/pytorch/xla/test'):
+for extra in ('/usr/share/torch-xla-1.7/pytorch/xla/test', '/pytorch/xla/test', '/usr/share/pytorch/xla/test'):
     if os.path.exists(extra):
         sys.path.insert(0, extra)
 
