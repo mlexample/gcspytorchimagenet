@@ -20,6 +20,9 @@ import time
 # import warnings
 # warnings.filterwarnings("ignore")
 from itertools import islice
+import torch_xla.debug.profiler as xp
+
+profiler_port=9012
 
 for extra in ('/usr/share/torch-xla-1.7/pytorch/xla/test', '/pytorch/xla/test', '/usr/share/pytorch/xla/test'):
     if os.path.exists(extra):
@@ -258,6 +261,8 @@ def train_imagenet():
         num_steps_per_epoch=num_training_steps_per_epoch,
         summary_writer=writer)
     loss_fn = nn.CrossEntropyLoss()
+    
+    server = xp.start_server(profiler_port)
 
     def train_loop_fn(loader, epoch):
         train_steps = trainsize // (FLAGS.batch_size * xm.xrt_world_size())
