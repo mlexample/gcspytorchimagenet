@@ -22,7 +22,7 @@ import time
 from itertools import islice
 import torch_xla.debug.profiler as xp
 
-profiler_port=9012
+# profiler_port=9012
 
 for extra in ('/usr/share/torch-xla-1.7/pytorch/xla/test', '/pytorch/xla/test', '/usr/share/pytorch/xla/test'):
     if os.path.exists(extra):
@@ -239,6 +239,8 @@ def train_imagenet():
     test_loader = make_val_loader(img_dim, resize_dim, batch_size=FLAGS.test_set_batch_size)
 
     torch.manual_seed(42)
+#     server = xp.start_server(flags.profiler_port)
+    server = xp.start_server(9012)
 
     device = xm.xla_device()
     model = get_model_property('model_fn')().to(device)
@@ -262,7 +264,7 @@ def train_imagenet():
         summary_writer=writer)
     loss_fn = nn.CrossEntropyLoss()
     
-    server = xp.start_server(profiler_port)
+#     server = xp.start_server(profiler_port)
 
     def train_loop_fn(loader, epoch):
         train_steps = trainsize // (FLAGS.batch_size * xm.xrt_world_size())
