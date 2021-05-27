@@ -39,7 +39,6 @@ SUPPORTED_MODELS = [
     'resnet50', 'squeezenet1_0', 'squeezenet1_1', 'vgg11', 'vgg11_bn', 'vgg13',
     'vgg13_bn', 'vgg16', 'vgg16_bn', 'vgg19', 'vgg19_bn'
 ]
-
 MODEL_OPTS = {
     '--model': {
         'choices': SUPPORTED_MODELS,
@@ -62,21 +61,44 @@ MODEL_OPTS = {
         'default': 'gcsdataset',
         'type': str,
     },
-    '--wds_train_dir':{
-        'type': str,
-    },
-    '--wds_test_dir':{
-        'type': str,
-    },
-    '--trainsize':{
-        'type': int,
-        'default': 1280000,
-    },
-    '--testsize':{
-        'type': int,
-        'default': 50000,
-    },
 }
+# MODEL_OPTS = {
+#     '--model': {
+#         'choices': SUPPORTED_MODELS,
+#         'default': 'resnet50',
+#     },
+#     '--test_set_batch_size': {
+#         'type': int,
+#     },
+#     '--lr_scheduler_type': {
+#         'type': str,
+#     },
+#     '--lr_scheduler_divide_every_n_epochs': {
+#         'type': int,
+#     },
+#     '--lr_scheduler_divisor': {
+#         'type': int,
+#     },
+#     '--dataset': {
+#         'choices': ['gcsdataset', 'torchdataset'],
+#         'default': 'gcsdataset',
+#         'type': str,
+#     },
+#     '--wds_train_dir':{
+#         'type': str,
+#     },
+#     '--wds_test_dir':{
+#         'type': str,
+#     },
+#     '--trainsize':{
+#         'type': int,
+#         'default': 1280000,
+#     },
+#     '--testsize':{
+#         'type': int,
+#         'default': 50000,
+#     },
+# }
 
 FLAGS = args_parse.parse_common_options(
     datadir='/tmp/imagenet',
@@ -85,7 +107,6 @@ FLAGS = args_parse.parse_common_options(
     momentum=None,
     lr=None,
     target_accuracy=None,
-    profiler_port=9012,
     opts=MODEL_OPTS.items(),
 )
 
@@ -145,8 +166,8 @@ def _train_update(device, step, loss, tracker, epoch, writer):
 
 ##### WDS ########
 # trainsize = 1281167 # all shards
-# trainsize = 1280000 # 1280 shards {000...079}
-# testsize = 50000
+trainsize = 1280000 # 1280 shards {000...079}
+testsize = 50000
 # testsize = 48000
 # num_dataset_instances = xm.xrt_world_size() * FLAGS.num_workers
 # epoch_size = datasets_size // num_dataset_instances
@@ -192,7 +213,7 @@ normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 
 def make_train_loader(img_dim, shuffle=10000, batch_size=FLAGS.batch_size):
     #"pipe:gsutil cat gs://tpu-demo-eu-west/imagenet-wds/wds-data/shards/imagenet-train-{000000..001281}.tar"
     num_dataset_instances = xm.xrt_world_size() * FLAGS.num_workers
-    epoch_size = FLAGS.trainsize // num_dataset_instances
+    epoch_size = trainsize // num_dataset_instances
     # num_batches = (epoch_size + batch_size - 1) // batch_size
     # num_batches = epoch_size // batch_size
 
@@ -205,7 +226,7 @@ def make_train_loader(img_dim, shuffle=10000, batch_size=FLAGS.batch_size):
         ]
     )
     dataset = (
-        wds.WebDataset(FLAGS.wds_train_dir, # {000000..001281} testing shard count
+        wds.WebDataset("pipe:cat file:/mnt/disks/dataset/webdataset/shards/imagenet-train-{000000..001281}.tar", # {000000..001281} testing shard count
         splitter=my_worker_splitter, nodesplitter=my_node_splitter, shardshuffle=True, length=epoch_size)
         .shuffle(shuffle)
         .decode("pil")
@@ -220,7 +241,7 @@ def make_train_loader(img_dim, shuffle=10000, batch_size=FLAGS.batch_size):
 def make_val_loader(img_dim, resize_dim, batch_size=FLAGS.test_set_batch_size):
     #"pipe:gsutil cat gs://tpu-demo-eu-west/imagenet-wds/wds-data/shards/imagenet-val-{000000..000049}.tar"
     num_dataset_instances = xm.xrt_world_size() * FLAGS.num_workers
-    epoch_test_size = FLAGS.testsize // num_dataset_instances
+    epoch_test_size = testsize // num_dataset_instances
     # num_batches = (epoch_size + batch_size - 1) // batch_size
     # num_test_batches = epoch_test_size // batch_size
 
@@ -234,7 +255,7 @@ def make_val_loader(img_dim, resize_dim, batch_size=FLAGS.test_set_batch_size):
     )
 
     val_dataset = (
-        wds.WebDataset(FLAGS.wds_test_dir, 
+        wds.WebDataset("pipe:cat file:/mnt/disks/dataset/webdataset/shards/imagenet-val-{000000..000049}.tar", 
         splitter=my_worker_splitter, nodesplitter=my_node_splitter, shardshuffle=False, length=epoch_test_size) 
         .decode("pil")
         .to_tuple("ppm;jpg;jpeg;png", "cls")
@@ -267,7 +288,7 @@ def train_imagenet():
         lr=FLAGS.lr,
         momentum=FLAGS.momentum,
         weight_decay=1e-4)
-    num_training_steps_per_epoch = FLAGS.trainsize // (
+    num_training_steps_per_epoch = trainsize // (
         FLAGS.batch_size * xm.xrt_world_size())
     lr_scheduler = schedulers.wrap_optimizer_with_scheduler(
         optimizer,
@@ -282,7 +303,7 @@ def train_imagenet():
 #     server = xp.start_server(profiler_port)
 
     def train_loop_fn(loader, epoch):
-        train_steps = FLAGS.trainsize // (FLAGS.batch_size * xm.xrt_world_size())
+        train_steps = trainsize // (FLAGS.batch_size * xm.xrt_world_size())
         tracker = xm.RateTracker()
         total_samples = 0
         model.train()
@@ -305,7 +326,7 @@ def train_imagenet():
         return total_samples                                   
                 
     def test_loop_fn(loader, epoch):
-        test_steps = FLAGS.testsize // (FLAGS.test_set_batch_size * xm.xrt_world_size())
+        test_steps = testsize // (FLAGS.test_set_batch_size * xm.xrt_world_size())
         total_samples, correct = 0, 0
         model.eval()
         for step, (data, target) in enumerate(loader): # repeatedly(loader) | enumerate(islice(loader, 0, test_steps)
