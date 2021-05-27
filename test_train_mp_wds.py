@@ -62,6 +62,20 @@ MODEL_OPTS = {
         'default': 'gcsdataset',
         'type': str,
     },
+    '--wds_train_dir':{
+        'type': str,
+    },
+    '--wds_test_dir':{
+        'type': str,
+    },
+    '--trainsize':{
+        'type': int,
+        'default': 1280000,
+    },
+    '--testsize':{
+        'type': int,
+        'default': 50000,
+    },
 }
 
 FLAGS = args_parse.parse_common_options(
@@ -71,11 +85,8 @@ FLAGS = args_parse.parse_common_options(
     momentum=None,
     lr=None,
     target_accuracy=None,
+    profiler_port=9012,
     opts=MODEL_OPTS.items(),
-    wds_train_dir=None,
-    wds_test_dir=None,
-    trainsize=1280000,
-    testsize=50000,
 )
 
 
@@ -244,7 +255,7 @@ def train_imagenet():
 
     torch.manual_seed(42)
 #     server = xp.start_server(flags.profiler_port)
-    server = xp.start_server(9012)
+    server = xp.start_server(FLAGS.profiler_port)
 
     device = xm.xla_device()
     model = get_model_property('model_fn')().to(device)
