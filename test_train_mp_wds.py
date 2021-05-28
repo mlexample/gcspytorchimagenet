@@ -282,22 +282,20 @@ def train_imagenet():
         total_samples = 0
         model.train()
         for step, (data, target) in enumerate(loader): # repeatedly(loader) | enumerate(islice(loader, 0, train_steps))
-            with xp.StepTrace('train_step', step_num=step):
-                with xp.Trace('build_graph'):
-                    optimizer.zero_grad()
-                    output = model(data)
-                    loss = loss_fn(output, target)
-                    loss.backward()
-                xm.optimizer_step(optimizer)
-                tracker.add(FLAGS.batch_size)
-                total_samples += data.size()[0]
-                if lr_scheduler:
-                    lr_scheduler.step()
-                if step % FLAGS.log_steps == 0:
-                    xm.add_step_closure(
-                        _train_update, args=(device, step, loss, tracker, epoch, writer))
-                if step == train_steps:
-                    break                    
+            optimizer.zero_grad()
+            output = model(data)
+            loss = loss_fn(output, target)
+            loss.backward()
+            xm.optimizer_step(optimizer)
+            tracker.add(FLAGS.batch_size)
+            total_samples += data.size()[0]
+            if lr_scheduler:
+                lr_scheduler.step()
+            if step % FLAGS.log_steps == 0:
+                xm.add_step_closure(
+                    _train_update, args=(device, step, loss, tracker, epoch, writer))
+            if step == train_steps:
+                break                    
 
         return total_samples                                   
                 
