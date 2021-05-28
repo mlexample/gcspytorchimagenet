@@ -80,6 +80,7 @@ FLAGS = args_parse.parse_common_options(
     lr=None,
     target_accuracy=None,
     opts=MODEL_OPTS.items(),
+    profiler_port=9012,
 )
 
 
@@ -249,7 +250,6 @@ def train_imagenet():
     test_loader = make_val_loader(img_dim, resize_dim, batch_size=FLAGS.test_set_batch_size)
 
     torch.manual_seed(42)
-#     server = xp.start_server(flags.profiler_port)
     server = xp.start_server(FLAGS.profiler_port)
 
     device = xm.xla_device()
@@ -282,20 +282,22 @@ def train_imagenet():
         total_samples = 0
         model.train()
         for step, (data, target) in enumerate(loader): # repeatedly(loader) | enumerate(islice(loader, 0, train_steps))
-            optimizer.zero_grad()
-            output = model(data)
-            loss = loss_fn(output, target)
-            loss.backward()
-            xm.optimizer_step(optimizer)
-            tracker.add(FLAGS.batch_size)
-            total_samples += data.size()[0]
-            if lr_scheduler:
-                lr_scheduler.step()
-            if step % FLAGS.log_steps == 0:
-                xm.add_step_closure(
-                    _train_update, args=(device, step, loss, tracker, epoch, writer))
-            if step == train_steps:
-                break                    
+            with xp.StepTrace('train_step', step_num=step):
+                with xp.Trace('build_graph'):
+                    optimizer.zero_grad()
+                    output = model(data)
+                    loss = loss_fn(output, target)
+                    loss.backward()
+                xm.optimizer_step(optimizer)
+                tracker.add(FLAGS.batch_size)
+                total_samples += data.size()[0]
+                if lr_scheduler:
+                    lr_scheduler.step()
+                if step % FLAGS.log_steps == 0:
+                    xm.add_step_closure(
+                        _train_update, args=(device, step, loss, tracker, epoch, writer))
+                if step == train_steps:
+                    break                    
 
         return total_samples                                   
                 
