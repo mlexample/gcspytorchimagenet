@@ -32,15 +32,15 @@ for extra in ('/usr/share/torch-xla-1.7/pytorch/xla/test', '/pytorch/xla/test', 
 import schedulers
 # import gcsdataset
 import args_parse # XLA arg parser
-import argparse # py arg parser
+# import argparse # py arg parser
 
-parser = argparse.ArgumentParser(description='WebDataset args for modified XLA model')
+# parser = argparse.ArgumentParser(description='WebDataset args for modified XLA model')
 
-parser.add_argument('--wds_traindir', type=str, default='/tmp/imagenet')
-parser.add_argument('--wds_testdir', type=str, default='/tmp/imagenet')
-parser.add_argument('--trainsize', type=int, default=1280000) 
-parser.add_argument('--testsize', type=int, default=50000)
-wds_args, others = parser.parse_known_args()
+# parser.add_argument('--wds_traindir', type=str, default='/tmp/imagenet')
+# parser.add_argument('--wds_testdir', type=str, default='/tmp/imagenet')
+# parser.add_argument('--trainsize', type=int, default=1280000) 
+# parser.add_argument('--testsize', type=int, default=50000)
+# wds_args, others = parser.parse_known_args()
 
 SUPPORTED_MODELS = [
     'alexnet', 'densenet121', 'densenet161', 'densenet169', 'densenet201',
@@ -71,43 +71,6 @@ MODEL_OPTS = {
         'type': str,
     },
 }
-# MODEL_OPTS = {
-#     '--model': {
-#         'choices': SUPPORTED_MODELS,
-#         'default': 'resnet50',
-#     },
-#     '--test_set_batch_size': {
-#         'type': int,
-#     },
-#     '--lr_scheduler_type': {
-#         'type': str,
-#     },
-#     '--lr_scheduler_divide_every_n_epochs': {
-#         'type': int,
-#     },
-#     '--lr_scheduler_divisor': {
-#         'type': int,
-#     },
-#     '--dataset': {
-#         'choices': ['gcsdataset', 'torchdataset'],
-#         'default': 'gcsdataset',
-#         'type': str,
-#     },
-#     '--wds_train_dir':{
-#         'type': str,
-#     },
-#     '--wds_test_dir':{
-#         'type': str,
-#     },
-#     '--trainsize':{
-#         'type': int,
-#         'default': 1280000,
-#     },
-#     '--testsize':{
-#         'type': int,
-#         'default': 50000,
-#     },
-# }
 
 FLAGS = args_parse.parse_common_options(
     datadir='/tmp/imagenet',
@@ -175,8 +138,8 @@ def _train_update(device, step, loss, tracker, epoch, writer):
 
 ##### WDS ########
 # trainsize = 1281167 # all shards
-# trainsize = 1280000 # 1280 shards {000...079}
-# testsize = 50000
+trainsize = 1280000 # 1280 shards {000...079}
+testsize = 50000
 # testsize = 48000
 # num_dataset_instances = xm.xrt_world_size() * FLAGS.num_workers
 # epoch_size = datasets_size // num_dataset_instances
@@ -223,7 +186,7 @@ def make_train_loader(img_dim, shuffle=10000, batch_size=FLAGS.batch_size):
     # "pipe:gsutil cat gs://tpu-demo-eu-west/imagenet-wds/wds-data/shards/imagenet-train-{000000..001281}.tar"
     # "pipe:cat /mnt/disks/dataset/webdataset/shards/imagenet-train-{000000..001281}.tar"
     num_dataset_instances = xm.xrt_world_size() * FLAGS.num_workers
-    epoch_size = wds_args.trainsize // num_dataset_instances
+    epoch_size = trainsize // num_dataset_instances
     # num_batches = (epoch_size + batch_size - 1) // batch_size
     # num_batches = epoch_size // batch_size
 
@@ -236,7 +199,7 @@ def make_train_loader(img_dim, shuffle=10000, batch_size=FLAGS.batch_size):
         ]
     )
     dataset = (
-        wds.WebDataset(wds_args.wds_traindir, # {000000..001281} testing shard count
+        wds.WebDataset("pipe:gsutil cat gs://tpu-demo-eu-west/imagenet-wds/wds-data/shards/imagenet-train-{000000..001281}.tar", # {000000..001281} testing shard count
         splitter=my_worker_splitter, nodesplitter=my_node_splitter, shardshuffle=True, length=epoch_size)
         .shuffle(shuffle)
         .decode("pil")
@@ -252,7 +215,7 @@ def make_val_loader(img_dim, resize_dim, batch_size=FLAGS.test_set_batch_size):
     #"pipe:gsutil cat gs://tpu-demo-eu-west/imagenet-wds/wds-data/shards/imagenet-val-{000000..000049}.tar"
     #"pipe:cat /mnt/disks/dataset/webdataset/shards/imagenet-val-{000000..000049}.tar"
     num_dataset_instances = xm.xrt_world_size() * FLAGS.num_workers
-    epoch_test_size = wds_args.testsize // num_dataset_instances
+    epoch_test_size = testsize // num_dataset_instances
     # num_batches = (epoch_size + batch_size - 1) // batch_size
     # num_test_batches = epoch_test_size // batch_size
 
@@ -266,7 +229,7 @@ def make_val_loader(img_dim, resize_dim, batch_size=FLAGS.test_set_batch_size):
     )
 
     val_dataset = (
-        wds.WebDataset(wds_args.wds_testdir, 
+        wds.WebDataset("pipe:gsutil cat gs://tpu-demo-eu-west/imagenet-wds/wds-data/shards/imagenet-val-{000000..000049}.tar", 
         splitter=my_worker_splitter, nodesplitter=my_node_splitter, shardshuffle=False, length=epoch_test_size) 
         .decode("pil")
         .to_tuple("ppm;jpg;jpeg;png", "cls")
@@ -299,7 +262,7 @@ def train_imagenet():
         lr=FLAGS.lr,
         momentum=FLAGS.momentum,
         weight_decay=1e-4)
-    num_training_steps_per_epoch = wds_args.trainsize // (
+    num_training_steps_per_epoch = trainsize // (
         FLAGS.batch_size * xm.xrt_world_size())
     lr_scheduler = schedulers.wrap_optimizer_with_scheduler(
         optimizer,
@@ -314,7 +277,7 @@ def train_imagenet():
 #     server = xp.start_server(profiler_port)
 
     def train_loop_fn(loader, epoch):
-        train_steps = wds_args.trainsize // (FLAGS.batch_size * xm.xrt_world_size())
+        train_steps = trainsize // (FLAGS.batch_size * xm.xrt_world_size())
         tracker = xm.RateTracker()
         total_samples = 0
         model.train()
@@ -337,7 +300,7 @@ def train_imagenet():
         return total_samples                                   
                 
     def test_loop_fn(loader, epoch):
-        test_steps = wds_args.testsize // (FLAGS.test_set_batch_size * xm.xrt_world_size())
+        test_steps = testsize // (FLAGS.test_set_batch_size * xm.xrt_world_size())
         total_samples, correct = 0, 0
         model.eval()
         for step, (data, target) in enumerate(loader): # repeatedly(loader) | enumerate(islice(loader, 0, test_steps)
