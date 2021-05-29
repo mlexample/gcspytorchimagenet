@@ -199,8 +199,9 @@ def make_train_loader(img_dim, shuffle=10000, batch_size=FLAGS.batch_size):
             normalize,
         ]
     )
+    # "pipe:gsutil cat gs://tpu-demo-eu-west/imagenet-wds/wds-data/shards/imagenet-train-{000000..001281}.tar"
     dataset = (
-        wds.WebDataset("pipe:gsutil cat gs://tpu-demo-eu-west/imagenet-wds/wds-data/shards/imagenet-train-{000000..001281}.tar", # {000000..001281} testing shard count
+        wds.WebDataset("pipe:gsutil cat gs://tpu-demo-eu-west/imagenet-wds/wds-data/shards-320/imagenet-train-{000000..000320}.tar", 
         splitter=my_worker_splitter, nodesplitter=my_node_splitter, shardshuffle=True, length=epoch_size)
         .shuffle(shuffle)
         .decode("pil")
@@ -228,9 +229,9 @@ def make_val_loader(img_dim, resize_dim, batch_size=FLAGS.test_set_batch_size):
             normalize,
         ]
     )
-
+    # "pipe:gsutil cat gs://tpu-demo-eu-west/imagenet-wds/wds-data/shards/imagenet-val-{000000..000049}.tar"
     val_dataset = (
-        wds.WebDataset("pipe:gsutil cat gs://tpu-demo-eu-west/imagenet-wds/wds-data/shards/imagenet-val-{000000..000049}.tar", 
+        wds.WebDataset("pipe:gsutil cat gs://tpu-demo-eu-west/imagenet-wds/wds-data/shards-320/imagenet-val-{000000..000012}.tar", 
         splitter=my_worker_splitter, nodesplitter=my_node_splitter, shardshuffle=False, length=epoch_test_size) 
         .decode("pil")
         .to_tuple("ppm;jpg;jpeg;png", "cls")
