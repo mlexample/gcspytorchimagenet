@@ -210,7 +210,7 @@ def make_train_loader(img_dim, shuffle=10000, batch_size=FLAGS.batch_size):
         .batched(batch_size, partial=True)
         )
 
-    loader = torch.utils.data.DataLoader(dataset, batch_size=None, shuffle=False, drop_last=False, num_workers=FLAGS.num_workers) # , worker_init_fn=worker_init_fn
+    loader = torch.utils.data.DataLoader(dataset, batch_size=None, shuffle=False, drop_last=True, num_workers=FLAGS.num_workers) # , worker_init_fn=worker_init_fn
     return loader
   
 def make_val_loader(img_dim, resize_dim, batch_size=FLAGS.test_set_batch_size):
