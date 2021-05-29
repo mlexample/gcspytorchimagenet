@@ -138,8 +138,8 @@ def _train_update(device, step, loss, tracker, epoch, writer):
         summary_writer=writer)
 
 ##### WDS ########
-trainsize = 1281167 # all shards
-# trainsize = 1280000 # 1280 shards {000...079}
+# trainsize = 1281167 # all shards
+trainsize = 1280000 # 1280 shards {000...079}
 testsize = 50000
 # testsize = 48000
 # num_dataset_instances = xm.xrt_world_size() * FLAGS.num_workers
@@ -202,7 +202,7 @@ def make_train_loader(img_dim, shuffle=10000, batch_size=FLAGS.batch_size):
     )
     
     dataset = (
-        wds.WebDataset("pipe:gsutil cat gs://tpu-demo-eu-west/imagenet-wds/wds-data/shards/imagenet-train-{000000..001281}.tar", 
+        wds.WebDataset("pipe:gsutil cat gs://tpu-demo-eu-west/imagenet-wds/wds-data/shards/imagenet-train-{000000..001279}.tar", 
         splitter=my_worker_splitter, nodesplitter=my_node_splitter, shardshuffle=True, length=epoch_size)
         .shuffle(shuffle)
         .decode("pil")
