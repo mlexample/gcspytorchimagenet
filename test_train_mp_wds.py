@@ -216,8 +216,8 @@ def make_train_loader(img_dim, shuffle=10000, batch_size=FLAGS.batch_size):
   
 def make_val_loader(img_dim, resize_dim, batch_size=FLAGS.test_set_batch_size):
     
-    # num_dataset_instances = xm.xrt_world_size() * FLAGS.num_workers
-    # epoch_test_size = testsize // num_dataset_instances
+    num_dataset_instances = xm.xrt_world_size() * FLAGS.num_workers
+    epoch_test_size = testsize // num_dataset_instances
     # num_batches = (epoch_size + batch_size - 1) // batch_size
     # num_test_batches = epoch_test_size // batch_size
 
