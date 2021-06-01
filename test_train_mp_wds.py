@@ -80,7 +80,7 @@ MODEL_OPTS = {
     },
     '--trainsize': {
         'type': int,
-        'deafult': 1280000
+        'default': 1280000
     },
     '--testsize': {
         'type': int,
