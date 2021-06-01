@@ -156,8 +156,8 @@ def _train_update(device, step, loss, tracker, epoch, writer):
 
 ##### WDS ########
 # trainsize = 1281167 # all shards
-trainsize = FLAGS.trainsize # 1280 shards {000...079}
-testsize = FLAGS.testsize # 50000
+trainsize = 1280000 #FLAGS.trainsize # 1280 shards {000...079}
+testsize = 50000 # FLAGS.testsize 
 
 train_dir = FLAGS.wds_traindir
 test_dir = FLAGS.wds_testdir
