@@ -78,16 +78,17 @@ MODEL_OPTS = {
         'type': str,
         'default': '/tmp/imagenet'
     },
-    '--trainsize': {
-        'type': int,
-        'default': 1280000
-    },
-    '--testsize': {
-        'type': int,
-        'default': 50000
-    },
 }
 
+#     '--trainsize': {
+#         'type': int,
+#         'default': 1280000
+#     },
+#     '--testsize': {
+#         'type': int,
+#         'default': 50000
+#     },
+        
 FLAGS = args_parse.parse_common_options(
     datadir='/tmp/imagenet',
     batch_size=None,
