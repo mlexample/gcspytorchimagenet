@@ -70,16 +70,16 @@ MODEL_OPTS = {
         'default': 'gcsdataset',
         'type': str,
     },
-    '--wds_traindir': {
-        'type': str,
-        'default':'/tmp/imagenet'
-    },
-    '--wds_testdir': {
-        'type': str,
-        'default': '/tmp/imagenet'
-    },
 }
 
+# '--wds_traindir': {
+#         'type': str,
+#         'default':'/tmp/imagenet'
+#     },
+#     '--wds_testdir': {
+#         'type': str,
+#         'default': '/tmp/imagenet'
+#     },
 #     '--trainsize': {
 #         'type': int,
 #         'default': 1280000
@@ -159,8 +159,8 @@ def _train_update(device, step, loss, tracker, epoch, writer):
 trainsize = 1280000 #FLAGS.trainsize # 1280 shards {000...079}
 testsize = 50000 # FLAGS.testsize 
 
-train_dir = FLAGS.wds_traindir
-test_dir = FLAGS.wds_testdir
+# train_dir = FLAGS.wds_traindir
+# test_dir = FLAGS.wds_testdir
 
 def identity(x):
     return x   
@@ -219,7 +219,7 @@ def make_train_loader(img_dim, shuffle=10000, batch_size=FLAGS.batch_size):
     )
     
     dataset = (
-        wds.WebDataset(FLAGS.wds_traindir, 
+        wds.WebDataset("pipe:gsutil cat gs://tpu-demo-eu-west/imagenet-wds/wds-data/shards/imagenet-train-{000000..001279}.tar", # FLAGS.wds_traindir, 
         splitter=my_worker_splitter, nodesplitter=my_node_splitter, shardshuffle=True, length=epoch_size)
         .shuffle(shuffle)
         .decode("pil")
@@ -250,7 +250,7 @@ def make_val_loader(img_dim, resize_dim, batch_size=FLAGS.test_set_batch_size):
     # "pipe:gsutil cat gs://tpu-demo-eu-west/imagenet-wds/wds-data/shards/imagenet-val-{000000..000049}.tar"
     # "pipe:cat /mnt/disks/dataset/webdataset/shards/imagenet-val-{000000..000049}.tar"
     val_dataset = (
-        wds.WebDataset(FLAGS.wds_testdir, 
+        wds.WebDataset("pipe:gsutil cat gs://tpu-demo-eu-west/imagenet-wds/wds-data/shards/imagenet-val-{000000..000049}.tar", # FLAGS.wds_testdir, 
         splitter=my_worker_splitter, nodesplitter=my_node_splitter, shardshuffle=False, length=epoch_test_size) 
         .decode("pil")
         .to_tuple("ppm;jpg;jpeg;png", "cls")
