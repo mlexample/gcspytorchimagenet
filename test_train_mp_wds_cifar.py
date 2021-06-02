@@ -128,7 +128,6 @@ for arg, value in default_value_dict.items():
     if getattr(FLAGS, arg) is None:
         setattr(FLAGS, arg, value)
 
-
 def get_model_property(key):
     default_model_property = {
         'img_dim': 224,
@@ -197,9 +196,12 @@ def my_node_splitter(urls):
     
     return urls_this
 
-normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+# normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) # imagenet
+normalize = transforms.Normalize(mean=[0.4914, 0.4822, 0.4465], std=[0.2023, 0.1994, 0.2010]) # cifar
 
-def make_train_loader(img_dim, shuffle=10000, batch_size=FLAGS.batch_size):
+cifar_img_dim = 32
+
+def make_train_loader(cifar_img_dim, shuffle=10000, batch_size=FLAGS.batch_size):
     # "pipe:gsutil cat gs://tpu-demo-eu-west/imagenet-wds/wds-data/shards/imagenet-train-{000000..001281}.tar"
     # "pipe:gsutil cat gs://tpu-demo-eu-west/imagenet-wds/wds-data/shards/imagenet-train-{000000..001279}.tar"
     # "pipe:cat /mnt/disks/dataset/webdataset/shards/imagenet-train-{000000..001281}.tar"
@@ -212,7 +214,7 @@ def make_train_loader(img_dim, shuffle=10000, batch_size=FLAGS.batch_size):
 
     image_transform = transforms.Compose(
         [
-            transforms.RandomResizedCrop(img_dim),
+            transforms.RandomCrop(cifar_img_dim, padding=4),
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             normalize,
@@ -220,7 +222,7 @@ def make_train_loader(img_dim, shuffle=10000, batch_size=FLAGS.batch_size):
     )
     
     dataset = (
-        wds.WebDataset("pipe:gsutil cat gs://tpu-demo-eu-west/imagenet-wds/wds-data/shards-640/imagenet-train-{000000..000639}.tar", # FLAGS.wds_traindir, 
+        wds.WebDataset("pipe:gsutil cat gs://tpu-demo-eu-west/cifar10/cifar-wds/cifar10-{000000..000160}.train.tar", # FLAGS.wds_traindir, 
         splitter=my_worker_splitter, nodesplitter=my_node_splitter, shardshuffle=True, length=epoch_size)
         .shuffle(shuffle)
         .decode("pil")
@@ -232,7 +234,7 @@ def make_train_loader(img_dim, shuffle=10000, batch_size=FLAGS.batch_size):
     loader = torch.utils.data.DataLoader(dataset, batch_size=None, shuffle=False, drop_last=False, num_workers=FLAGS.num_workers) # , worker_init_fn=worker_init_fn
     return loader
   
-def make_val_loader(img_dim, resize_dim, batch_size=FLAGS.test_set_batch_size):
+def make_val_loader(cifar_img_dim, batch_size=FLAGS.test_set_batch_size):
     
     num_dataset_instances = xm.xrt_world_size() * FLAGS.num_workers
     epoch_test_size = testsize // num_dataset_instances
@@ -241,8 +243,6 @@ def make_val_loader(img_dim, resize_dim, batch_size=FLAGS.test_set_batch_size):
 
     val_transform = transforms.Compose(
         [
-            transforms.Resize(resize_dim),
-            transforms.CenterCrop(img_dim),
             transforms.ToTensor(),
             normalize,
         ]
@@ -252,7 +252,7 @@ def make_val_loader(img_dim, resize_dim, batch_size=FLAGS.test_set_batch_size):
     # "pipe:cat /mnt/disks/dataset/webdataset/shards/imagenet-val-{000000..000049}.tar"
     # "pipe:gsutil cat gs://tpu-demo-eu-west/imagenet-wds/wds-data/shards-640/imagenet-val-{000000..000024}.tar"
     val_dataset = (
-        wds.WebDataset("pipe:gsutil cat gs://tpu-demo-eu-west/imagenet-wds/wds-data/shards/imagenet-val-{000000..000049}.tar", # FLAGS.wds_testdir, 
+        wds.WebDataset("pipe:gsutil cat gs://tpu-demo-eu-west/cifar10/cifar-wds/cifar10/cifar10-{000000..000031}.test.tar", # FLAGS.wds_testdir, 
         splitter=my_worker_splitter, nodesplitter=my_node_splitter, shardshuffle=False, length=epoch_test_size) 
         .decode("pil")
         .to_tuple("ppm;jpg;jpeg;png", "cls")
@@ -266,10 +266,8 @@ def make_val_loader(img_dim, resize_dim, batch_size=FLAGS.test_set_batch_size):
     
 def train_imagenet():
     print('==> Preparing data..')
-    img_dim = get_model_property('img_dim')
-    resize_dim = max(img_dim, 256)
-    train_loader = make_train_loader(img_dim, batch_size=FLAGS.batch_size, shuffle=10000)
-    test_loader = make_val_loader(img_dim, resize_dim, batch_size=FLAGS.test_set_batch_size)
+    train_loader = make_train_loader(cifar_img_dim, batch_size=FLAGS.batch_size, shuffle=10000)
+    test_loader = make_val_loader(cifar_img_dim, batch_size=FLAGS.test_set_batch_size)
 
     torch.manual_seed(42)
     server = xp.start_server(FLAGS.profiler_port)
