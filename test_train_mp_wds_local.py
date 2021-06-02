@@ -202,9 +202,10 @@ normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 
 def make_train_loader(img_dim, shuffle=10000, batch_size=FLAGS.batch_size):
     # "pipe:gsutil cat gs://tpu-demo-eu-west/imagenet-wds/wds-data/shards/imagenet-train-{000000..001281}.tar"
     # "pipe:gsutil cat gs://tpu-demo-eu-west/imagenet-wds/wds-data/shards/imagenet-train-{000000..001279}.tar"
-    # "pipe:cat /mnt/disks/dataset/webdataset/shards/imagenet-train-{000000..001281}.tar"
+    # "pipe:cat /mnt/disks/dataset/webdataset/shards/imagenet-train-{000000..001279}.tar"
     # "pipe:gsutil cat gs://tpu-demo-eu-west/imagenet-wds/wds-data/shards-320/imagenet-train-{000000..000320}.tar"
     # "pipe:gsutil cat gs://tpu-demo-eu-west/imagenet-wds/wds-data/shards-640/imagenet-train-{000000..000639}.tar"
+    # "pipe:cat /mnt/disks/dataset/webdataset/shards-640/imagenet-train-{000000..000639}.tar"
     num_dataset_instances = xm.xrt_world_size() * FLAGS.num_workers
     epoch_size = trainsize // num_dataset_instances
     # num_batches = (epoch_size + batch_size - 1) // batch_size
@@ -220,7 +221,7 @@ def make_train_loader(img_dim, shuffle=10000, batch_size=FLAGS.batch_size):
     )
     
     dataset = (
-        wds.WebDataset("pipe:cat /mnt/disks/dataset/webdataset/shards-640/imagenet-train-{000000..000639}.tar", # FLAGS.wds_traindir, 
+        wds.WebDataset("pipe:cat /mnt/disks/dataset/webdataset/shards/imagenet-train-{000000..001279}.tar", # FLAGS.wds_traindir, 
         splitter=my_worker_splitter, nodesplitter=my_node_splitter, shardshuffle=True, length=epoch_size)
         .shuffle(shuffle)
         .decode("pil")
