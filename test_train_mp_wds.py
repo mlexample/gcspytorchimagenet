@@ -100,6 +100,7 @@ FLAGS = args_parse.parse_common_options(
     profiler_port=9012,
 )
 
+print("Profiler data logged in:", FLAGS.logdir)
 
 DEFAULT_KWARGS = dict(
     batch_size=128,
@@ -220,7 +221,7 @@ def make_train_loader(img_dim, shuffle=10000, batch_size=FLAGS.batch_size):
     )
     
     dataset = (
-        wds.WebDataset("pipe:gsutil cat gs://tpu-demo-eu-west/imagenet-wds/wds-data/shards/imagenet-train-{000000..001279}.tar", # FLAGS.wds_traindir, 
+        wds.WebDataset("pipe:gsutil cat gs://tpu-demo-eu-west/imagenet-wds/wds-data/shards-640/imagenet-train-{000000..000639}.tar", # FLAGS.wds_traindir, 
         splitter=my_worker_splitter, nodesplitter=my_node_splitter, shardshuffle=True, length=epoch_size)
         .shuffle(shuffle)
         .decode("pil")
@@ -312,7 +313,8 @@ def train_imagenet():
             xm.optimizer_step(optimizer)
             tracker.add(FLAGS.batch_size)
             total_samples += data.size()[0]
-            rate_list.append(tracker.rate()) 
+#             rate_list.append(tracker.rate())
+            replica_rate = tracker.rate()
             global_rate = tracker.global_rate()
             if lr_scheduler:
                 lr_scheduler.step()
@@ -322,9 +324,9 @@ def train_imagenet():
             if step == train_steps:
                 break   
         
-        replica_max_rate = np.max(rate_list)
+#         replica_max_rate = np.max(tracker.rate())
         reduced_global = xm.mesh_reduce('reduced_global', global_rate, np.mean)
-        reduced_max_rate = xm.mesh_reduce('max_rate', replica_max_rate, np.mean)
+        reduced_max_rate = xm.mesh_reduce('max_rate', replica_rate, np.mean)
 
         return total_samples, reduced_global, reduced_max_rate                                   
                 
@@ -363,7 +365,7 @@ def train_imagenet():
         accuracy, accuracy_replica, replica_test_samples = test_loop_fn(test_device_loader, epoch)
 #         replica_epoch_time = time.time() - replica_epoch_start
 #         avg_epoch_time_mesh = xm.mesh_reduce('epoch_time', replica_epoch_time, np.mean)
-        xm.master_print('Epoch {} test end {}, Reduced Accuracy={:.2f}%, Replica Accuracy={:.2f}%, Replica Train Samples={}, Replica Test Samples={}, Reduced Epoch Time={}, Reduced GlobalRate={}, Reduced MaxRate={}'.format(
+        xm.master_print('Epoch {} test end {}, Reduced Accuracy={:.2f}%, Replica Accuracy={:.2f}%, Replica Train Samples={}, Replica Test Samples={}, Reduced Epoch Time={}, Reduced GlobalRate={:.2f}, Reduced MaxRate={:.2f}'.format(
             epoch, test_utils.now(), accuracy, accuracy_replica, replica_train_samples, 
             replica_test_samples, str(datetime.timedelta(seconds=avg_epoch_time_mesh)).split('.')[0], reduced_global, reduced_max_rate))
         max_accuracy = max(accuracy, max_accuracy)
@@ -373,7 +375,7 @@ def train_imagenet():
             dict_to_write={'Accuracy/test': accuracy,
                            'Global Rate': reduced_global,
                            'Max Rate': reduced_max_rate},
-            write_xla_metrics=True)
+            write_xla_metrics=False)
         if FLAGS.metrics_debug:
             xm.master_print(met.metrics_report())
     test_utils.close_summary_writer(writer)
