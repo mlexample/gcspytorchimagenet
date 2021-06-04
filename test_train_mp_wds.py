@@ -100,8 +100,6 @@ FLAGS = args_parse.parse_common_options(
     profiler_port=9012,
 )
 
-print("Profiler data logged in:", FLAGS.logdir)
-
 DEFAULT_KWARGS = dict(
     batch_size=128,
     test_set_batch_size=64,
@@ -306,6 +304,7 @@ def train_imagenet():
         rate_list = []
         model.train()
         for step, (data, target) in enumerate(loader): # repeatedly(loader) | enumerate(islice(loader, 0, train_steps))
+            global_step += 1
             optimizer.zero_grad()
             output = model(data)
             loss = loss_fn(output, target)
@@ -314,19 +313,20 @@ def train_imagenet():
             tracker.add(FLAGS.batch_size)
             total_samples += data.size()[0]
 #             rate_list.append(tracker.rate())
-            replica_rate = tracker.rate()
-            global_rate = tracker.global_rate()
+#             replica_rate = tracker.rate()
+#             global_rate = tracker.global_rate()
             if lr_scheduler:
                 lr_scheduler.step()
             if step % FLAGS.log_steps == 0:
                 xm.add_step_closure(
                     _train_update, args=(device, step, loss, tracker, epoch, writer))
+                test_utils.write_to_summary(writer, global_step, dict_to_write={'Rate, step': tracker.rate()}, write_xla_metrics=False)
             if step == train_steps:
                 break   
         
 #         replica_max_rate = np.max(tracker.rate())
-        reduced_global = xm.mesh_reduce('reduced_global', global_rate, np.mean)
-        reduced_max_rate = xm.mesh_reduce('max_rate', replica_rate, np.mean)
+        reduced_global = xm.mesh_reduce('reduced_global', tracker.global_rate(), np.mean)
+        reduced_max_rate = xm.mesh_reduce('max_rate', tracker.rate(), np.mean)
 
         return total_samples, reduced_global, reduced_max_rate                                   
                 
@@ -352,6 +352,7 @@ def train_imagenet():
     train_device_loader = pl.MpDeviceLoader(train_loader, device)
     test_device_loader = pl.MpDeviceLoader(test_loader, device)
     accuracy, max_accuracy = 0.0, 0.0
+    global_step = 0
     training_start_time = time.time()
     for epoch in range(1, FLAGS.num_epochs + 1):
         xm.master_print('Epoch {} train begin {}'.format(
