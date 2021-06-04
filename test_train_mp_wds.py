@@ -302,6 +302,7 @@ def train_imagenet():
         train_steps = trainsize // (FLAGS.batch_size * xm.xrt_world_size())
         tracker = xm.RateTracker()
         total_samples = 0
+        rate_list = []
         model.train()
         for step, (data, target) in enumerate(loader): # repeatedly(loader) | enumerate(islice(loader, 0, train_steps))
             optimizer.zero_grad()
@@ -311,15 +312,21 @@ def train_imagenet():
             xm.optimizer_step(optimizer)
             tracker.add(FLAGS.batch_size)
             total_samples += data.size()[0]
+            rate_list.append(tracker.rate()) 
+            global_rate = tracker.global_rate()
             if lr_scheduler:
                 lr_scheduler.step()
             if step % FLAGS.log_steps == 0:
                 xm.add_step_closure(
                     _train_update, args=(device, step, loss, tracker, epoch, writer))
             if step == train_steps:
-                break                    
+                break   
+        
+        replica_max_rate = np.max(rate_list)
+        reduced_global = xm.mesh_reduce('reduced_global', global_rate, np.mean)
+        reduced_max_rate = xm.mesh_reduce('max_rate', replica_max_rate, np.mean)
 
-        return total_samples                                   
+        return total_samples, reduced_global, reduced_max_rate                                   
                 
     def test_loop_fn(loader, epoch):
         test_steps = testsize // (FLAGS.test_set_batch_size * xm.xrt_world_size())
@@ -348,19 +355,24 @@ def train_imagenet():
         xm.master_print('Epoch {} train begin {}'.format(
             epoch, test_utils.now()))
         replica_epoch_start = time.time()
-        replica_train_samples = train_loop_fn(train_device_loader, epoch)
+        replica_train_samples, reduced_global, reduced_max_rate = train_loop_fn(train_device_loader, epoch)
+        replica_epoch_time = time.time() - replica_epoch_start
+        avg_epoch_time_mesh = xm.mesh_reduce('epoch_time', replica_epoch_time, np.mean)
         xm.master_print('Epoch {} train end {}'.format(
             epoch, test_utils.now()))
         accuracy, accuracy_replica, replica_test_samples = test_loop_fn(test_device_loader, epoch)
-        replica_epoch_time = time.time() - replica_epoch_start
-        avg_epoch_time_mesh = xm.mesh_reduce('epoch_time', replica_epoch_time, np.mean)
-        xm.master_print('Epoch {} test end {}, Reduced Accuracy={:.2f}%, Replica Accuracy={:.2f}%, Replica Train Samples={}, Replica Test Samples={}, Reduced Epoch Time={}'.format(
-            epoch, test_utils.now(), accuracy, accuracy_replica, replica_train_samples, replica_test_samples, str(datetime.timedelta(seconds=avg_epoch_time_mesh)).split('.')[0]))
+#         replica_epoch_time = time.time() - replica_epoch_start
+#         avg_epoch_time_mesh = xm.mesh_reduce('epoch_time', replica_epoch_time, np.mean)
+        xm.master_print('Epoch {} test end {}, Reduced Accuracy={:.2f}%, Replica Accuracy={:.2f}%, Replica Train Samples={}, Replica Test Samples={}, Reduced Epoch Time={}, Reduced GlobalRate={}, Reduced MaxRate={}'.format(
+            epoch, test_utils.now(), accuracy, accuracy_replica, replica_train_samples, 
+            replica_test_samples, str(datetime.timedelta(seconds=avg_epoch_time_mesh)).split('.')[0], reduced_global, reduced_max_rate))
         max_accuracy = max(accuracy, max_accuracy)
         test_utils.write_to_summary(
             writer,
             epoch,
-            dict_to_write={'Accuracy/test': accuracy},
+            dict_to_write={'Accuracy/test': accuracy,
+                           'Global Rate': reduced_global,
+                           'Max Rate': reduced_max_rate},
             write_xla_metrics=True)
         if FLAGS.metrics_debug:
             xm.master_print(met.metrics_report())
@@ -368,6 +380,7 @@ def train_imagenet():
     total_train_time = time.time() - training_start_time
     xm.master_print('Total Train Time: {}'.format(str(datetime.timedelta(seconds=total_train_time)).split('.')[0]))    
     xm.master_print('Max Accuracy: {:.2f}%'.format(max_accuracy))
+    xm.master_print('Global Rate: {:.2f} examples per second'.format(reduced_global))
     return max_accuracy
 
 
