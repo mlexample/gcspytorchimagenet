@@ -378,7 +378,7 @@ def train_imagenet():
             writer,
             epoch,
             dict_to_write={'Accuracy/test': accuracy,
-                           'Global Rate': reduced_global,
+                           'Global Rate': reduced_global},
             write_xla_metrics=False)
         if FLAGS.metrics_debug:
             xm.master_print(met.metrics_report())
