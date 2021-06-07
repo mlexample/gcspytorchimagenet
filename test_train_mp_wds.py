@@ -294,7 +294,7 @@ def train_imagenet():
         num_steps_per_epoch=num_training_steps_per_epoch,
         summary_writer=writer)
     loss_fn = nn.CrossEntropyLoss()
-    global_step = 0
+#     global_step = 0
     
 #     server = xp.start_server(profiler_port)
 
@@ -305,7 +305,7 @@ def train_imagenet():
         rate_list = []
         model.train()
         for step, (data, target) in enumerate(loader): # repeatedly(loader) | enumerate(islice(loader, 0, train_steps))
-            global_step += 1
+#             global_step += 1
             optimizer.zero_grad()
             output = model(data)
             loss = loss_fn(output, target)
@@ -321,7 +321,7 @@ def train_imagenet():
             if step % FLAGS.log_steps == 0:
                 xm.add_step_closure(
                     _train_update, args=(device, step, loss, tracker, epoch, writer))
-                test_utils.write_to_summary(writer, global_step, dict_to_write={'Rate, step': tracker.rate()}, write_xla_metrics=False)
+                test_utils.write_to_summary(writer, step, dict_to_write={'Rate, step': tracker.rate()}, write_xla_metrics=False)
             if step == train_steps:
                 break   
         
