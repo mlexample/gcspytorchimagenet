@@ -246,7 +246,7 @@ def train_imagenet():
       if step % FLAGS.log_steps == 0:
         xm.add_step_closure(
             _train_update, args=(device, step, loss, tracker, epoch, writer))
-        test_utils.write_to_summary(writer, step, dict_to_Write={'Rate_step': tracker.rate()}, write_xla_metrics=False)
+        test_utils.write_to_summary(writer, step, dict_to_write={'Rate_step': tracker.rate()}, write_xla_metrics=False)
     reduced_global = xm.mesh_reduce('reduced_global', tracker.global_rate(), np.mean)
     return total_samples, reduced_global
   
