@@ -1,3 +1,21 @@
+import os
+import schedulers
+import datetime
+import time
+import numpy as np
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
+import torchvision
+import torchvision.transforms as transforms
+import torch_xla
+import torch_xla.debug.metrics as met
+import torch_xla.distributed.parallel_loader as pl
+import torch_xla.utils.utils as xu
+import torch_xla.core.xla_model as xm
+import torch_xla.distributed.xla_multiprocessing as xmp
+import torch_xla.test.test_utils as test_utils
 import args_parse
 
 SUPPORTED_MODELS = [
@@ -40,24 +58,25 @@ FLAGS = args_parse.parse_common_options(
     opts=MODEL_OPTS.items(),
 )
 
-import os
-import schedulers
-import datetime
-import time
-import numpy as np
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import torch.optim as optim
-import torchvision
-import torchvision.transforms as transforms
-import torch_xla
-import torch_xla.debug.metrics as met
-import torch_xla.distributed.parallel_loader as pl
-import torch_xla.utils.utils as xu
-import torch_xla.core.xla_model as xm
-import torch_xla.distributed.xla_multiprocessing as xmp
-import torch_xla.test.test_utils as test_utils
+# import os
+# import schedulers
+# import datetime
+# import time
+# import numpy as np
+# import torch
+# import torch.nn as nn
+# import torch.nn.functional as F
+# import torch.optim as optim
+# import torchvision
+# import torchvision.transforms as transforms
+# import torch_xla
+# import torch_xla.debug.metrics as met
+# import torch_xla.distributed.parallel_loader as pl
+# import torch_xla.utils.utils as xu
+# import torch_xla.core.xla_model as xm
+# import torch_xla.distributed.xla_multiprocessing as xmp
+# import torch_xla.test.test_utils as test_utils
+# import args_parse
 
 DEFAULT_KWARGS = dict(
     batch_size=128,
