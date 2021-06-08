@@ -231,6 +231,7 @@ def train_imagenet():
 
   def train_loop_fn(loader, epoch):
     tracker = xm.RateTracker()
+    total_samples = 0
     model.train()
     for step, (data, target) in enumerate(loader):
       optimizer.zero_grad()
