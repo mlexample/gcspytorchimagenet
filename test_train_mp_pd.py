@@ -1,5 +1,4 @@
 import os
-import schedulers
 import datetime
 import time
 import numpy as np
@@ -16,7 +15,14 @@ import torch_xla.utils.utils as xu
 import torch_xla.core.xla_model as xm
 import torch_xla.distributed.xla_multiprocessing as xmp
 import torch_xla.test.test_utils as test_utils
+
+
+for extra in ('/usr/share/torch-xla-1.7/pytorch/xla/test', '/pytorch/xla/test', '/usr/share/pytorch/xla/test'):
+    if os.path.exists(extra):
+        sys.path.insert(0, extra)
+
 import args_parse
+import schedulers
 
 SUPPORTED_MODELS = [
     'alexnet', 'densenet121', 'densenet161', 'densenet169', 'densenet201',
