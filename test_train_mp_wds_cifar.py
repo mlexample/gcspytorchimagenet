@@ -34,6 +34,7 @@ SUPPORTED_MODELS = [
     'resnet50', 'squeezenet1_0', 'squeezenet1_1', 'vgg11', 'vgg11_bn', 'vgg13',
     'vgg13_bn', 'vgg16', 'vgg16_bn', 'vgg19', 'vgg19_bn'
 ]
+
 MODEL_OPTS = {
     '--model': {
         'choices': SUPPORTED_MODELS,
@@ -64,17 +65,15 @@ MODEL_OPTS = {
         'type': str,
         'default': '/tmp/imagenet',
     },
+    '--trainsize': {
+        'type': int,
+        'default': 1280000,
+    },
+    '--testsize': {
+        'type': int,
+        'default': 50000,
+    },
 }
-
-
-#     '--trainsize': {
-#         'type': int,
-#         'default': 1280000
-#     },
-#     '--testsize': {
-#         'type': int,
-#         'default': 50000
-#     },
         
 FLAGS = args_parse.parse_common_options(
     datadir='/tmp/imagenet',
@@ -142,8 +141,8 @@ def _train_update(device, step, loss, tracker, epoch, writer):
 
 ##### WDS ########
 # trainsize = 1281167 # all shards
-trainsize = 1280000 #FLAGS.trainsize 
-testsize = 50000 # FLAGS.testsize 
+trainsize = FLAGS.trainsize # 1280000
+testsize = FLAGS.testsize # 50000 
 
 def identity(x):
     return x   
