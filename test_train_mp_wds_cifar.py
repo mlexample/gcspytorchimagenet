@@ -17,30 +17,16 @@ import os
 import webdataset as wds
 import datetime
 import time
-# import warnings
-# warnings.filterwarnings("ignore")
 from itertools import islice
 import torch_xla.debug.profiler as xp
 
 
-# profiler_port=9012
-
-for extra in ('/usr/share/torch-xla-1.7/pytorch/xla/test', '/pytorch/xla/test', '/usr/share/pytorch/xla/test'):
+for extra in ('/usr/share/torch-xla-1.8/pytorch/xla/test', '/pytorch/xla/test', '/usr/share/pytorch/xla/test'):
     if os.path.exists(extra):
         sys.path.insert(0, extra)
 
 import schedulers
-# import gcsdataset
-import args_parse # XLA arg parser
-# import argparse # py arg parser
-
-# parser = argparse.ArgumentParser(description='WebDataset args for modified XLA model')
-
-# parser.add_argument('--wds_traindir', type=str, default='/tmp/imagenet')
-# parser.add_argument('--wds_testdir', type=str, default='/tmp/imagenet')
-# parser.add_argument('--trainsize', type=int, default=1280000) 
-# parser.add_argument('--testsize', type=int, default=50000)
-# wds_args, others = parser.parse_known_args()
+import args_parse 
 
 SUPPORTED_MODELS = [
     'alexnet', 'densenet121', 'densenet161', 'densenet169', 'densenet201',
@@ -70,16 +56,17 @@ MODEL_OPTS = {
         'default': 'gcsdataset',
         'type': str,
     },
+    '--wds_traindir': {
+        'type': str,
+        'default':'/tmp/imagenet',
+    },
+    '--wds_testdir': {
+        'type': str,
+        'default': '/tmp/imagenet',
+    },
 }
 
-# '--wds_traindir': {
-#         'type': str,
-#         'default':'/tmp/imagenet'
-#     },
-#     '--wds_testdir': {
-#         'type': str,
-#         'default': '/tmp/imagenet'
-#     },
+
 #     '--trainsize': {
 #         'type': int,
 #         'default': 1280000
@@ -155,11 +142,8 @@ def _train_update(device, step, loss, tracker, epoch, writer):
 
 ##### WDS ########
 # trainsize = 1281167 # all shards
-trainsize = 1280000 #FLAGS.trainsize # 1280 shards {000...079}
+trainsize = 1280000 #FLAGS.trainsize 
 testsize = 50000 # FLAGS.testsize 
-
-# train_dir = FLAGS.wds_traindir
-# test_dir = FLAGS.wds_testdir
 
 def identity(x):
     return x   
@@ -202,11 +186,9 @@ normalize = transforms.Normalize(mean=[0.4914, 0.4822, 0.4465], std=[0.2023, 0.1
 cifar_img_dim = 32
 
 def make_train_loader(cifar_img_dim, shuffle=10000, batch_size=FLAGS.batch_size):
-    # "pipe:gsutil cat gs://tpu-demo-eu-west/cifar10/cifar-wds/cifar10-{000000..000160}.train.tar"
+    # "pipe:gsutil cat gs://tpu-demo-eu-west/cifar10/cifar-shards/train/cifar-train-{000000..000639}.tar"
     num_dataset_instances = xm.xrt_world_size() * FLAGS.num_workers
     epoch_size = trainsize // num_dataset_instances
-    # num_batches = (epoch_size + batch_size - 1) // batch_size
-    # num_batches = epoch_size // batch_size
 
     image_transform = transforms.Compose(
         [
@@ -218,7 +200,7 @@ def make_train_loader(cifar_img_dim, shuffle=10000, batch_size=FLAGS.batch_size)
     )
     
     dataset = (
-        wds.WebDataset("pipe:gsutil cat gs://tpu-demo-eu-west/cifar10/cifar-shards/train/cifar-train-{000000..000639}.tar", # FLAGS.wds_traindir, 
+        wds.WebDataset(FLAGS.wds_traindir, 
         splitter=my_worker_splitter, nodesplitter=my_node_splitter, shardshuffle=True, length=epoch_size)
         .shuffle(shuffle)
         .decode("pil")
@@ -231,11 +213,9 @@ def make_train_loader(cifar_img_dim, shuffle=10000, batch_size=FLAGS.batch_size)
     return loader
   
 def make_val_loader(cifar_img_dim, batch_size=FLAGS.test_set_batch_size):
-    
+    # "pipe:gsutil cat gs://tpu-demo-eu-west/cifar10/cifar-shards/val/cifar-val-{000000..000049}.tar"
     num_dataset_instances = xm.xrt_world_size() * FLAGS.num_workers
     epoch_test_size = testsize // num_dataset_instances
-    # num_batches = (epoch_size + batch_size - 1) // batch_size
-    # num_test_batches = epoch_test_size // batch_size
 
     val_transform = transforms.Compose(
         [
@@ -245,7 +225,7 @@ def make_val_loader(cifar_img_dim, batch_size=FLAGS.test_set_batch_size):
     )
 
     val_dataset = (
-        wds.WebDataset("pipe:gsutil cat gs://tpu-demo-eu-west/cifar10/cifar-shards/val/cifar-val-{000000..000049}.tar", # FLAGS.wds_testdir, 
+        wds.WebDataset(FLAGS.wds_testdir, 
         splitter=my_worker_splitter, nodesplitter=my_node_splitter, shardshuffle=False, length=epoch_test_size) 
         .decode("pil")
         .to_tuple("ppm;jpg;jpeg;png", "cls")
@@ -253,7 +233,7 @@ def make_val_loader(cifar_img_dim, batch_size=FLAGS.test_set_batch_size):
         .batched(batch_size, partial=True)
     )
 
-    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=None, shuffle=False, num_workers=FLAGS.num_workers) # , worker_init_fn=worker_init_fn, pin_memory=False 
+    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=None, shuffle=False, num_workers=FLAGS.num_workers) 
     return val_loader
 
     
@@ -294,7 +274,7 @@ def train_imagenet():
         tracker = xm.RateTracker()
         total_samples = 0
         model.train()
-        for step, (data, target) in enumerate(loader): # repeatedly(loader) | enumerate(islice(loader, 0, train_steps))
+        for step, (data, target) in enumerate(loader):
             optimizer.zero_grad()
             output = model(data)
             loss = loss_fn(output, target)
@@ -318,7 +298,7 @@ def train_imagenet():
         test_steps = testsize // (FLAGS.test_set_batch_size * xm.xrt_world_size())
         total_samples, correct = 0, 0
         model.eval()
-        for step, (data, target) in enumerate(loader): # repeatedly(loader) | enumerate(islice(loader, 0, test_steps)
+        for step, (data, target) in enumerate(loader):
             output = model(data)
             pred = output.max(1, keepdim=True)[1]
             correct += pred.eq(target.view_as(pred)).sum()
