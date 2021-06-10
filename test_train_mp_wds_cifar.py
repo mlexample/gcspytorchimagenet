@@ -314,10 +314,12 @@ def train_imagenet():
             if step % FLAGS.log_steps == 0:
                 xm.add_step_closure(
                     _train_update, args=(device, step, loss, tracker, epoch, writer))
+                test_utils.write_to_summary(writer, step, dict_to_write={'Rate_step': tracker.rate()}, write_xla_metrics=False)
             if step == train_steps:
-                break                    
-
-        return total_samples                                   
+                break
+                
+        reduced_global = xm.mesh_reduce('reduced_global', tracker.global_rate(), np.mean)
+        return total_samples, reduced_global                                   
                 
     def test_loop_fn(loader, epoch):
         test_steps = testsize // (FLAGS.test_set_batch_size * xm.xrt_world_size())
@@ -346,26 +348,35 @@ def train_imagenet():
         xm.master_print('Epoch {} train begin {}'.format(
             epoch, test_utils.now()))
         replica_epoch_start = time.time()
-        replica_train_samples = train_loop_fn(train_device_loader, epoch)
-        xm.master_print('Epoch {} train end {}'.format(
-            epoch, test_utils.now()))
-        accuracy, accuracy_replica, replica_test_samples = test_loop_fn(test_device_loader, epoch)
+        
+        replica_train_samples, reduced_global = train_loop_fn(train_device_loader, epoch)
+        
         replica_epoch_time = time.time() - replica_epoch_start
         avg_epoch_time_mesh = xm.mesh_reduce('epoch_time', replica_epoch_time, np.mean)
-        xm.master_print('Epoch {} test end {}, Reduced Accuracy={:.2f}%, Replica Accuracy={:.2f}%, Replica Train Samples={}, Replica Test Samples={}, Reduced Epoch Time={}'.format(
-            epoch, test_utils.now(), accuracy, accuracy_replica, replica_train_samples, replica_test_samples, str(datetime.timedelta(seconds=avg_epoch_time_mesh)).split('.')[0]))
+        reduced_global = reduced_global * xm.xrt_world_size()
+        
+        xm.master_print('Epoch {} train end {}, Epoch Time={}, Replica Train Samples={}, Reduced GlobalRate={:.2f}'.format(
+            epoch, test_utils.now(), str(datetime.timedelta(seconds=avg_epoch_time_mesh)).split('.')[0], replica_train_samples, reduced_global))
+
+        accuracy, accuracy_replica, replica_test_samples = test_loop_fn(test_device_loader, epoch)
+        
+        xm.master_print('Epoch {} test end {}, Reduced Accuracy={:.2f}%, Replica Accuracy={:.2f}%, Replica Test Samples={}'.format(
+            epoch, test_utils.now(), accuracy, accuracy_replica, replica_test_samples))
+        
         max_accuracy = max(accuracy, max_accuracy)
         test_utils.write_to_summary(
             writer,
             epoch,
-            dict_to_write={'Accuracy/test': accuracy},
-            write_xla_metrics=True)
+            dict_to_write={'Accuracy/test': accuracy,
+                           'Global Rate': reduced_global},
+            write_xla_metrics=False)
         if FLAGS.metrics_debug:
             xm.master_print(met.metrics_report())
     test_utils.close_summary_writer(writer)
     total_train_time = time.time() - training_start_time
     xm.master_print('Total Train Time: {}'.format(str(datetime.timedelta(seconds=total_train_time)).split('.')[0]))    
     xm.master_print('Max Accuracy: {:.2f}%'.format(max_accuracy))
+    xm.master_print('Avg. Global Rate: {:.2f} examples per second'.format(reduced_global))
     return max_accuracy
 
 
