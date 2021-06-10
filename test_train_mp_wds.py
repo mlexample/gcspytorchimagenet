@@ -17,30 +17,18 @@ import os
 import webdataset as wds
 import datetime
 import time
-# import warnings
-# warnings.filterwarnings("ignore")
 from itertools import islice
 import torch_xla.debug.profiler as xp
 
 
-# profiler_port=9012
 
-for extra in ('/usr/share/torch-xla-1.7/pytorch/xla/test', '/pytorch/xla/test', '/usr/share/pytorch/xla/test'):
+for extra in ('/usr/share/torch-xla-1.8/pytorch/xla/test', '/pytorch/xla/test', '/usr/share/pytorch/xla/test'):
     if os.path.exists(extra):
         sys.path.insert(0, extra)
 
 import schedulers
-# import gcsdataset
-import args_parse # XLA arg parser
-# import argparse # py arg parser
+import args_parse 
 
-# parser = argparse.ArgumentParser(description='WebDataset args for modified XLA model')
-
-# parser.add_argument('--wds_traindir', type=str, default='/tmp/imagenet')
-# parser.add_argument('--wds_testdir', type=str, default='/tmp/imagenet')
-# parser.add_argument('--trainsize', type=int, default=1280000) 
-# parser.add_argument('--testsize', type=int, default=50000)
-# wds_args, others = parser.parse_known_args()
 
 SUPPORTED_MODELS = [
     'alexnet', 'densenet121', 'densenet161', 'densenet169', 'densenet201',
@@ -78,23 +66,24 @@ MODEL_OPTS = {
         'type': str,
         'default': '/tmp/imagenet',
     },
+    '--trainsize': {
+        'type': int,
+        'default': 1280000,
+    },
+    '--testsize': {
+        'type': int,
+        'default': 50000,
+    },
 }
 
-# '--wds_traindir': {
-#         'type': str,
-#         'default':'/tmp/imagenet'
-#     },
-#     '--wds_testdir': {
-#         'type': str,
-#         'default': '/tmp/imagenet'
-#     },
+
 #     '--trainsize': {
 #         'type': int,
-#         'default': 1280000
+#         'default': 1280000,
 #     },
 #     '--testsize': {
 #         'type': int,
-#         'default': 50000
+#         'default': 50000,
 #     },
         
 FLAGS = args_parse.parse_common_options(
@@ -163,11 +152,9 @@ def _train_update(device, step, loss, tracker, epoch, writer):
 
 ##### WDS ########
 # trainsize = 1281167 # all shards
-trainsize = 1280000 #FLAGS.trainsize # 1280 shards {000...079}
-testsize = 50000 # FLAGS.testsize 
+trainsize = FLAGS.trainsize # 1280000
+testsize = FLAGS.testsize # 50000 
 
-# train_dir = FLAGS.wds_traindir
-# test_dir = FLAGS.wds_testdir
 
 def identity(x):
     return x   
@@ -214,8 +201,6 @@ def make_train_loader(img_dim, shuffle=10000, batch_size=FLAGS.batch_size):
     # "pipe:gsutil cat gs://tpu-demo-eu-west/imagenet-wds/wds-data/shards-640/imagenet-train-{000000..000639}.tar"
     num_dataset_instances = xm.xrt_world_size() * FLAGS.num_workers
     epoch_size = trainsize // num_dataset_instances
-    # num_batches = (epoch_size + batch_size - 1) // batch_size
-    # num_batches = epoch_size // batch_size
 
     image_transform = transforms.Compose(
         [
@@ -227,7 +212,7 @@ def make_train_loader(img_dim, shuffle=10000, batch_size=FLAGS.batch_size):
     )
     
     dataset = (
-        wds.WebDataset(FLAGS.wds_traindir, # FLAGS.wds_traindir, 
+        wds.WebDataset(FLAGS.wds_traindir, 
         splitter=my_worker_splitter, nodesplitter=my_node_splitter, shardshuffle=True, length=epoch_size)
         .shuffle(shuffle)
         .decode("pil")
@@ -236,7 +221,7 @@ def make_train_loader(img_dim, shuffle=10000, batch_size=FLAGS.batch_size):
         .batched(batch_size, partial=True)
         )
 
-    loader = torch.utils.data.DataLoader(dataset, batch_size=None, shuffle=False, drop_last=False, num_workers=FLAGS.num_workers) # , worker_init_fn=worker_init_fn
+    loader = torch.utils.data.DataLoader(dataset, batch_size=None, shuffle=False, drop_last=False, num_workers=FLAGS.num_workers)
     return loader
   
 def make_val_loader(img_dim, resize_dim, batch_size=FLAGS.test_set_batch_size):
