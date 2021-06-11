@@ -139,10 +139,8 @@ def _train_update(device, step, loss, tracker, epoch, writer):
         epoch,
         summary_writer=writer)
 
-##### WDS ########
-# trainsize = 1281167 # all shards
-trainsize = FLAGS.trainsize # 1280000
-testsize = FLAGS.testsize # 50000 
+trainsize = FLAGS.trainsize 
+testsize = FLAGS.testsize 
 
 def identity(x):
     return x   
@@ -185,7 +183,6 @@ normalize = transforms.Normalize(mean=[0.4914, 0.4822, 0.4465], std=[0.2023, 0.1
 cifar_img_dim = 32
 
 def make_train_loader(cifar_img_dim, shuffle=10000, batch_size=FLAGS.batch_size):
-    # "pipe:gsutil cat gs://tpu-demo-eu-west/cifar10/cifar-shards/train/cifar-train-{000000..000639}.tar"
     num_dataset_instances = xm.xrt_world_size() * FLAGS.num_workers
     epoch_size = trainsize // num_dataset_instances
 
@@ -212,7 +209,6 @@ def make_train_loader(cifar_img_dim, shuffle=10000, batch_size=FLAGS.batch_size)
     return loader
   
 def make_val_loader(cifar_img_dim, batch_size=FLAGS.test_set_batch_size):
-    # "pipe:gsutil cat gs://tpu-demo-eu-west/cifar10/cifar-shards/val/cifar-val-{000000..000049}.tar"
     num_dataset_instances = xm.xrt_world_size() * FLAGS.num_workers
     epoch_test_size = testsize // num_dataset_instances
 
