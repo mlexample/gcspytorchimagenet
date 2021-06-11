@@ -73,6 +73,10 @@ MODEL_OPTS = {
         'type': int,
         'default': 50000,
     },
+    '--save_model': {
+        'type': str,
+        'default': '/tmp/model-chkpt',
+    },
 }
         
 FLAGS = args_parse.parse_common_options(
@@ -312,6 +316,8 @@ def train_imagenet():
     test_device_loader = pl.MpDeviceLoader(test_loader, device)
     accuracy, max_accuracy = 0.0, 0.0
     training_start_time = time.time()
+    best_valid_acc = 0.0
+    
     for epoch in range(1, FLAGS.num_epochs + 1):
         xm.master_print('Epoch {} train begin {}'.format(
             epoch, test_utils.now()))
@@ -322,15 +328,26 @@ def train_imagenet():
         replica_epoch_time = time.time() - replica_epoch_start
         avg_epoch_time_mesh = xm.mesh_reduce('epoch_time', replica_epoch_time, np.mean)
         reduced_global = reduced_global * xm.xrt_world_size()
-        
         xm.master_print('Epoch {} train end {}, Epoch Time={}, Replica Train Samples={}, Reduced GlobalRate={:.2f}'.format(
             epoch, test_utils.now(), str(datetime.timedelta(seconds=avg_epoch_time_mesh)).split('.')[0], replica_train_samples, reduced_global))
 
         accuracy, accuracy_replica, replica_test_samples = test_loop_fn(test_device_loader, epoch)
-        
         xm.master_print('Epoch {} test end {}, Reduced Accuracy={:.2f}%, Replica Accuracy={:.2f}%, Replica Test Samples={}'.format(
             epoch, test_utils.now(), accuracy, accuracy_replica, replica_test_samples))
-        
+        if accuracy > best_valid_acc:
+            xm.master_print('Epoch {} validation accuracy improved from {:.2f}% to {:.2f}%.. saving model'.format(epoch, best_valid_acc, accuracy))
+            best_valid_acc = accuracy
+            xm.save(
+                {
+                    "epoch": epoch,
+                    "nepochs": FLAGS.num_epochs,
+                    "state_dict": model.state_dict(),
+                    "valid_acc": best_valid_acc,
+                    "opt_state_dict": optimizer.state_dict(),
+                },
+                FLAGS.save_model
+            )
+                            
         max_accuracy = max(accuracy, max_accuracy)
         test_utils.write_to_summary(
             writer,
