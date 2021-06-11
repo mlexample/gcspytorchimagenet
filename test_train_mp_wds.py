@@ -20,8 +20,6 @@ import time
 from itertools import islice
 import torch_xla.debug.profiler as xp
 
-
-
 for extra in ('/usr/share/torch-xla-1.8/pytorch/xla/test', '/pytorch/xla/test', '/usr/share/pytorch/xla/test'):
     if os.path.exists(extra):
         sys.path.insert(0, extra)
@@ -76,16 +74,6 @@ MODEL_OPTS = {
     },
 }
 
-
-#     '--trainsize': {
-#         'type': int,
-#         'default': 1280000,
-#     },
-#     '--testsize': {
-#         'type': int,
-#         'default': 50000,
-#     },
-        
 FLAGS = args_parse.parse_common_options(
     datadir='/tmp/imagenet',
     batch_size=None,
@@ -150,11 +138,8 @@ def _train_update(device, step, loss, tracker, epoch, writer):
         epoch,
         summary_writer=writer)
 
-##### WDS ########
-# trainsize = 1281167 # all shards
 trainsize = FLAGS.trainsize # 1280000
 testsize = FLAGS.testsize # 50000 
-
 
 def identity(x):
     return x   
@@ -194,11 +179,7 @@ def my_node_splitter(urls):
 normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 
 def make_train_loader(img_dim, shuffle=10000, batch_size=FLAGS.batch_size):
-    # "pipe:gsutil cat gs://tpu-demo-eu-west/imagenet-wds/wds-data/shards/imagenet-train-{000000..001281}.tar"
-    # "pipe:gsutil cat gs://tpu-demo-eu-west/imagenet-wds/wds-data/shards/imagenet-train-{000000..001279}.tar"
-    # "pipe:cat /mnt/disks/dataset/webdataset/shards/imagenet-train-{000000..001281}.tar"
-    # "pipe:gsutil cat gs://tpu-demo-eu-west/imagenet-wds/wds-data/shards-320/imagenet-train-{000000..000320}.tar"
-    # "pipe:gsutil cat gs://tpu-demo-eu-west/imagenet-wds/wds-data/shards-640/imagenet-train-{000000..000639}.tar"
+
     num_dataset_instances = xm.xrt_world_size() * FLAGS.num_workers
     epoch_size = trainsize // num_dataset_instances
 
@@ -228,8 +209,6 @@ def make_val_loader(img_dim, resize_dim, batch_size=FLAGS.test_set_batch_size):
     
     num_dataset_instances = xm.xrt_world_size() * FLAGS.num_workers
     epoch_test_size = testsize // num_dataset_instances
-    # num_batches = (epoch_size + batch_size - 1) // batch_size
-    # num_test_batches = epoch_test_size // batch_size
 
     val_transform = transforms.Compose(
         [
@@ -239,10 +218,7 @@ def make_val_loader(img_dim, resize_dim, batch_size=FLAGS.test_set_batch_size):
             normalize,
         ]
     )
-    # "pipe:gsutil cat gs://tpu-demo-eu-west/imagenet-wds/wds-data/shards-320/imagenet-val-{000000..000012}.tar"
-    # "pipe:gsutil cat gs://tpu-demo-eu-west/imagenet-wds/wds-data/shards/imagenet-val-{000000..000049}.tar"
-    # "pipe:cat /mnt/disks/dataset/webdataset/shards/imagenet-val-{000000..000049}.tar"
-    # "pipe:gsutil cat gs://tpu-demo-eu-west/imagenet-wds/wds-data/shards-640/imagenet-val-{000000..000024}.tar"
+
     val_dataset = (
         wds.WebDataset(FLAGS.wds_testdir, # FLAGS.wds_testdir, 
         splitter=my_worker_splitter, nodesplitter=my_node_splitter, shardshuffle=False, length=epoch_test_size) 
@@ -252,7 +228,7 @@ def make_val_loader(img_dim, resize_dim, batch_size=FLAGS.test_set_batch_size):
         .batched(batch_size, partial=True)
     )
 
-    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=None, shuffle=False, num_workers=FLAGS.num_workers) # , worker_init_fn=worker_init_fn, pin_memory=False 
+    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=None, shuffle=False, num_workers=FLAGS.num_workers) 
     return val_loader
 
     
@@ -287,7 +263,6 @@ def train_imagenet():
         num_steps_per_epoch=num_training_steps_per_epoch,
         summary_writer=writer)
     loss_fn = nn.CrossEntropyLoss()
-#     global_step = 0
     
 #     server = xp.start_server(profiler_port)
 
@@ -297,8 +272,7 @@ def train_imagenet():
         total_samples = 0
         rate_list = []
         model.train()
-        for step, (data, target) in enumerate(loader): # repeatedly(loader) | enumerate(islice(loader, 0, train_steps))
-#             global_step += 1
+        for step, (data, target) in enumerate(loader):
             optimizer.zero_grad()
             output = model(data)
             loss = loss_fn(output, target)
@@ -306,9 +280,6 @@ def train_imagenet():
             xm.optimizer_step(optimizer)
             tracker.add(FLAGS.batch_size)
             total_samples += data.size()[0]
-#             rate_list.append(tracker.rate())
-#             replica_rate = tracker.rate()
-#             global_rate = tracker.global_rate()
             if lr_scheduler:
                 lr_scheduler.step()
             if step % FLAGS.log_steps == 0:
@@ -318,9 +289,7 @@ def train_imagenet():
             if step == train_steps:
                 break   
         
-#         replica_max_rate = np.max(tracker.rate())
         reduced_global = xm.mesh_reduce('reduced_global', tracker.global_rate(), np.mean)
-#         reduced_max_rate = xm.mesh_reduce('max_rate', tracker.rate(), np.mean)
 
         return total_samples, reduced_global                                   
                 
@@ -328,7 +297,7 @@ def train_imagenet():
         test_steps = testsize // (FLAGS.test_set_batch_size * xm.xrt_world_size())
         total_samples, correct = 0, 0
         model.eval()
-        for step, (data, target) in enumerate(loader): # repeatedly(loader) | enumerate(islice(loader, 0, test_steps)
+        for step, (data, target) in enumerate(loader):
             output = model(data)
             pred = output.max(1, keepdim=True)[1]
             correct += pred.eq(target.view_as(pred)).sum()
