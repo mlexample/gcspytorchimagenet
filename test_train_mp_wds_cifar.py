@@ -19,6 +19,8 @@ import datetime
 import time
 from itertools import islice
 import torch_xla.debug.profiler as xp
+from google.cloud import storage
+from google.cloud.storage.bucket import Bucket
 
 
 for extra in ('/usr/share/torch-xla-1.8/pytorch/xla/test', '/pytorch/xla/test', '/usr/share/pytorch/xla/test'):
@@ -145,6 +147,16 @@ def _train_update(device, step, loss, tracker, epoch, writer):
 
 trainsize = FLAGS.trainsize 
 testsize = FLAGS.testsize 
+
+def _upload_blob(gcs_uri, source_file_name, destination_blob_name):
+    """Uploads a file to GCS bucket"""
+    client = storage.Client()
+    bucket = Bucket.from_string(gcs_uri, client)
+    blob = bucket.blob(destination_blob_name)
+    blob.upload_from_filename(source_file_name)
+    
+    print("File {} uploaded to {}.".format(source_file_name, destination_blob_name))
+    
 
 def identity(x):
     return x   
@@ -347,6 +359,7 @@ def train_imagenet():
                 },
                 FLAGS.save_model
             )
+            _upload_blob(FLAGS.logdir, FLAGS.save_model, "model)
                             
         max_accuracy = max(accuracy, max_accuracy)
         test_utils.write_to_summary(
