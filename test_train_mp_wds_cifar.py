@@ -153,9 +153,9 @@ def _upload_blob(gcs_uri, source_file_name, destination_blob_name):
     client = storage.Client()
     bucket = Bucket.from_string(gcs_uri, client)
     blob = bucket.blob(destination_blob_name)
-    blob.upload_from_filename(source_file_name)
+    blob.upload_from_file(source_file_name)
     
-    print("File {} uploaded to {}.".format(source_file_name, destination_blob_name))
+    print("File {} uploaded to {}.".format(source_file_name, os.path.join(gcs_uri, destination_blob_name)))
     
 
 def identity(x):
@@ -359,7 +359,8 @@ def train_imagenet():
                 },
                 FLAGS.save_model
             )
-            _upload_blob(FLAGS.logdir, FLAGS.save_model, FLAGS.save_model)
+            if xm.is_master_ordinal():
+                _upload_blob(FLAGS.logdir, FLAGS.save_model, 'model-chkpt.pt')
                             
         max_accuracy = max(accuracy, max_accuracy)
         test_utils.write_to_summary(
