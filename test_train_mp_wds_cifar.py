@@ -359,7 +359,7 @@ def train_imagenet():
                 },
                 FLAGS.save_model
             )
-            _upload_blob(FLAGS.logdir, FLAGS.save_model, "model)
+            _upload_blob(FLAGS.logdir, FLAGS.save_model, FLAGS.save_model)
                             
         max_accuracy = max(accuracy, max_accuracy)
         test_utils.write_to_summary(
