@@ -21,6 +21,7 @@ from itertools import islice
 import torch_xla.debug.profiler as xp
 from google.cloud import storage
 from google.cloud.storage.bucket import Bucket
+from google.cloud.storage.blob import Blob
 
 
 for extra in ('/usr/share/torch-xla-1.8/pytorch/xla/test', '/pytorch/xla/test', '/usr/share/pytorch/xla/test'):
