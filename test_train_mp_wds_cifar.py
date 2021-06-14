@@ -156,11 +156,17 @@ def _upload_blob(gcs_uri, source_file_name, destination_blob_name):
     blob.bucket._client = client
     blob.upload_from_filename(source_file_name)
     
-    print("File {} uploaded to {}.".format(source_file_name, os.path.join(gcs_uri, destination_blob_name)))
+    print("Saved Model Checkpoint file {} and uploaded to {}.".format(source_file_name, os.path.join(gcs_uri, destination_blob_name)))
     
 # def _read_bob(gcs_uri, source_file_name, destination_blob_name):
 #     client = storage.Client()
-#     blob = download_blob_file
+#     blob = download_blob_file(FLAGS.load_model)
+#     client.download_blob_to_file(os.path.join(gcs_uri, source_file_name), "/tmp/model-chkpt.pt")
+    
+#     print("Loading saved model {}".format(FLAGS.load_model))
+    
+# if FLAGS.load_model != "":
+#     _read_blob(
     
 
 def identity(x):
