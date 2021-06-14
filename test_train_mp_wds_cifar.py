@@ -153,7 +153,7 @@ def _upload_blob(gcs_uri, source_file_name, destination_blob_name):
     client = storage.Client()
     bucket = Bucket.from_string(gcs_uri, client)
     blob = bucket.blob(destination_blob_name)
-    blob.upload_from_file(source_file_name)
+    blob.upload_from_filename(source_file_name)
     
     print("File {} uploaded to {}.".format(source_file_name, os.path.join(gcs_uri, destination_blob_name)))
     
