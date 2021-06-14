@@ -212,8 +212,10 @@ def make_train_loader(cifar_img_dim, shuffle=10000, batch_size=FLAGS.batch_size)
     )
     
     dataset = (
-        wds.WebDataset(FLAGS.wds_traindir, 
-        splitter=my_worker_splitter, nodesplitter=my_node_splitter, shardshuffle=True, length=epoch_size)
+        wds.WebDataset(FLAGS.wds_traindir,
+                       splitter=my_worker_splitter,
+                       nodesplitter=my_node_splitter,
+                       shardshuffle=True, length=epoch_size)
         .shuffle(shuffle)
         .decode("pil")
         .to_tuple("ppm;jpg;jpeg;png", "cls")
