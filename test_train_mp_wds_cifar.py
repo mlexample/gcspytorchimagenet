@@ -296,10 +296,10 @@ def train_imagenet():
         xm.master_print("Loading saved model {}".format(FLAGS.load_chkpt_file))
 #         checkpoint = _read_bob_gcs(FLAGS.bucket, FLAGS.load_chkpt_file)
         checkpoint = torch.load(FLAGS.load_chkpt_file)
-        model.load_state_dict(checkpoint['model_state_dict']).to(device)
+        model.load_state_dict(checkpoint['state_dict']).to(device)
         optimizer.load_state_dict(checkpoint['opt_state_dict']).to(device)
 #         start_epoch = checkpoint['epoch']
-#         best_valid_acc = checkpoint['best_valid_acc']
+#         best_valid_acc = checkpoint['valid_acc']
     
 #     server = xp.start_server(profiler_port)
 
@@ -354,7 +354,7 @@ def train_imagenet():
     training_start_time = time.time()
     
     if FLAGS.load_chkpt_file != "":
-        best_valid_acc = checkpoint['best_valid_acc']
+        best_valid_acc = checkpoint['valid_acc']
         start_epoch = checkpoint['epoch']
         xm.master_print('Loaded Model CheckPoint: Epoch={}/{}, Val Accuracy={:.2f}%'.format(
             start_epoch, FLAGS.num_epochs, best_valid_acc))
@@ -396,8 +396,8 @@ def train_imagenet():
                     {
                         "epoch": epoch,
                         "nepochs": FLAGS.num_epochs,
-                        "model_state_dict": model.state_dict(),
-                        "best_valid_acc": best_valid_acc,
+                        "state_dict": model.state_dict(),
+                        "valid_acc": best_valid_acc,
                         "opt_state_dict": optimizer.state_dict(),
                     },
                     FLAGS.save_model
