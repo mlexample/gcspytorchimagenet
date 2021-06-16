@@ -22,7 +22,7 @@ import torch_xla.debug.profiler as xp
 from google.cloud import storage
 from google.cloud.storage.bucket import Bucket
 from google.cloud.storage.blob import Blob
-import torch_xla.utils.serialization as xser
+# import torch_xla.utils.serialization as xser
 
 
 for extra in ('/usr/share/torch-xla-1.8/pytorch/xla/test', '/pytorch/xla/test', '/usr/share/pytorch/xla/test'):
@@ -304,7 +304,7 @@ def train_imagenet():
     if FLAGS.load_chkpt_file != "":
         xm.master_print("Loading saved model {}".format(FLAGS.load_chkpt_file))
         _read_blob_gcs(FLAGS.model_bucket, FLAGS.load_chkpt_file, FLAGS.load_chkpt_dir)
-        checkpoint = xser.load(FLAGS.load_chkpt_dir) # torch.load(FLAGS.load_chkpt_dir)
+        checkpoint = torch.load(FLAGS.load_chkpt_dir) # torch.load(FLAGS.load_chkpt_dir)
         model.load_state_dict(checkpoint['model_state_dict']) #.to(device)
         optimizer.load_state_dict(checkpoint['opt_state_dict']) #.to(device)
 #         start_epoch = checkpoint['epoch']
@@ -396,7 +396,7 @@ def train_imagenet():
             if accuracy > best_valid_acc:
                 xm.master_print('Epoch {} validation accuracy improved from {:.2f}% to {:.2f}% - saving model...'.format(epoch, best_valid_acc, accuracy))
                 best_valid_acc = accuracy
-                xser.save(
+                xm.save(
                     {
                         "epoch": epoch,
                         "nepochs": FLAGS.num_epochs,
