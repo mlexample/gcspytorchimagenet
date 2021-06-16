@@ -404,7 +404,7 @@ def train_imagenet():
                         "best_valid_acc": best_valid_acc,
                         "opt_state_dict": optimizer.state_dict(),
                     },
-                    FLAGS.save_model
+                    FLAGS.save_model,
                 )
                 if xm.is_master_ordinal():
                     _upload_blob_gcs(FLAGS.logdir, FLAGS.save_model, 'model-chkpt.pt')
