@@ -89,7 +89,7 @@ MODEL_OPTS = {
         'type': str,
         'default': "",
     },
-    '--bucket': {
+    '--model_bucket': {
         'type': str,
         'default': "",
     },
@@ -303,7 +303,7 @@ def train_imagenet():
     loss_fn = nn.CrossEntropyLoss()
     if FLAGS.load_chkpt_file != "":
         xm.master_print("Loading saved model {}".format(FLAGS.load_chkpt_file))
-        _read_blob_gcs(FLAGS.bucket, FLAGS.load_chkpt_file, FLAGS.load_chkpt_dir)
+        _read_blob_gcs(FLAGS.model_bucket, FLAGS.load_chkpt_file, FLAGS.load_chkpt_dir)
         checkpoint = torch.load(FLAGS.load_chkpt_dir)
         model.load_state_dict(checkpoint['state_dict']) #.to(device)
         optimizer.load_state_dict(checkpoint['opt_state_dict']) #.to(device)
