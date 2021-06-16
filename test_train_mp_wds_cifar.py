@@ -85,6 +85,14 @@ MODEL_OPTS = {
         'type': str,
         'default': "",
     },
+    '--load_chkpt_dir': {
+        'type': str,
+        'default': "",
+    },
+    '--bucket': {
+        'type': str,
+        'default': "",
+    },
 }
         
 FLAGS = args_parse.parse_common_options(
@@ -163,10 +171,11 @@ def _upload_blob_gcs(gcs_uri, source_file_name, destination_blob_name):
     
     xm.master_print("Saved Model Checkpoint file {} and uploaded to {}.".format(source_file_name, os.path.join(gcs_uri, destination_blob_name)))
     
-# def _read_bob_gcs(BUCKET, CHKPT_FILE):
-#     client = storage.Client()
-#     bucket = client.get_bucket(BUCKET)
-#     blob = bucket.get_blob(CHKPT_FILE)
+def _read_blob_gcs(BUCKET, CHKPT_FILE, DESTINATION):
+    client = storage.Client()
+    bucket = client.get_bucket(BUCKET)
+    blob = bucket.get_blob(CHKPT_FILE)
+    blob.download_to_filename(DESTINATION)
 #     chkpt_file = blob.download_as_string()
 #     chkpt_file = chkpt_file.decode("utf-8")
 #     return chkpt_file
@@ -294,8 +303,8 @@ def train_imagenet():
     loss_fn = nn.CrossEntropyLoss()
     if FLAGS.load_chkpt_file != "":
         xm.master_print("Loading saved model {}".format(FLAGS.load_chkpt_file))
-#         checkpoint = _read_bob_gcs(FLAGS.bucket, FLAGS.load_chkpt_file)
-        checkpoint = torch.load(FLAGS.load_chkpt_file)
+        _read_blob_gcs(FLAGS.bucket, FLAGS.load_chkpt_file, FLAGS.load_chkpt_dir)
+        checkpoint = torch.load(FLAGS.load_chkpt_dir)
         model.load_state_dict(checkpoint['state_dict']) #.to(device)
         optimizer.load_state_dict(checkpoint['opt_state_dict']) #.to(device)
 #         start_epoch = checkpoint['epoch']
