@@ -304,11 +304,11 @@ def train_imagenet():
     if FLAGS.load_chkpt_file != "":
         xm.master_print("Loading saved model {}".format(FLAGS.load_chkpt_file))
         _read_blob_gcs(FLAGS.model_bucket, FLAGS.load_chkpt_file, FLAGS.load_chkpt_dir)
-        checkpoint = torch.load(FLAGS.load_chkpt_dir)
-        model.load_state_dict(checkpoint['state_dict']) #.to(device)
+        checkpoint = xser.load(FLAGS.load_chkpt_dir) # torch.load(FLAGS.load_chkpt_dir)
+        model.load_state_dict(checkpoint['model_state_dict']) #.to(device)
         optimizer.load_state_dict(checkpoint['opt_state_dict']) #.to(device)
 #         start_epoch = checkpoint['epoch']
-#         best_valid_acc = checkpoint['valid_acc']
+#         best_valid_acc = checkpoint['best_valid_acc']
     
 #     server = xp.start_server(profiler_port)
 
@@ -363,18 +363,13 @@ def train_imagenet():
     training_start_time = time.time()
     
     if FLAGS.load_chkpt_file != "":
-        best_valid_acc = checkpoint['valid_acc']
+        best_valid_acc = checkpoint['best_valid_acc']
         start_epoch = checkpoint['epoch']
         xm.master_print('Loaded Model CheckPoint: Epoch={}/{}, Val Accuracy={:.2f}%'.format(
             start_epoch, FLAGS.num_epochs, best_valid_acc))
     else:
         best_valid_acc = 0.0
         start_epoch = 1
-        
-#     if FLAGS.load_chkpt_file != "":
-#         start_epoch = checkpoint['epoch']
-#     else:
-#         start_epoch = 1
     
     for epoch in range(start_epoch, FLAGS.num_epochs + 1):
         xm.master_print('Epoch {} train begin {}'.format(
@@ -401,12 +396,12 @@ def train_imagenet():
             if accuracy > best_valid_acc:
                 xm.master_print('Epoch {} validation accuracy improved from {:.2f}% to {:.2f}% - saving model...'.format(epoch, best_valid_acc, accuracy))
                 best_valid_acc = accuracy
-                xm.save(
+                xser.save(
                     {
                         "epoch": epoch,
                         "nepochs": FLAGS.num_epochs,
-                        "state_dict": model.state_dict(),
-                        "valid_acc": best_valid_acc,
+                        "model_state_dict": model.state_dict(),
+                        "best_valid_acc": best_valid_acc,
                         "opt_state_dict": optimizer.state_dict(),
                     },
                     FLAGS.save_model
