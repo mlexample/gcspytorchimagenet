@@ -22,6 +22,7 @@ import torch_xla.debug.profiler as xp
 from google.cloud import storage
 from google.cloud.storage.bucket import Bucket
 from google.cloud.storage.blob import Blob
+import torch_xla.utils.serialization as xser
 
 
 for extra in ('/usr/share/torch-xla-1.8/pytorch/xla/test', '/pytorch/xla/test', '/usr/share/pytorch/xla/test'):
@@ -78,7 +79,11 @@ MODEL_OPTS = {
     },
     '--save_model': {
         'type': str,
-        'default': '/tmp/model-chkpt',
+        'default': "",
+    },
+    '--load_chkpt_file': {
+        'type': str,
+        'default': "",
     },
 }
         
@@ -149,26 +154,23 @@ def _train_update(device, step, loss, tracker, epoch, writer):
 trainsize = FLAGS.trainsize 
 testsize = FLAGS.testsize 
 
-def _upload_blob(gcs_uri, source_file_name, destination_blob_name):
+def _upload_blob_gcs(gcs_uri, source_file_name, destination_blob_name):
     """Uploads a file to GCS bucket"""
     client = storage.Client()
     blob = Blob.from_string(os.path.join(gcs_uri, destination_blob_name))
     blob.bucket._client = client
     blob.upload_from_filename(source_file_name)
     
-    print("Saved Model Checkpoint file {} and uploaded to {}.".format(source_file_name, os.path.join(gcs_uri, destination_blob_name)))
+    xm.master_print("Saved Model Checkpoint file {} and uploaded to {}.".format(source_file_name, os.path.join(gcs_uri, destination_blob_name)))
     
-# def _read_bob(gcs_uri, source_file_name, destination_blob_name):
+# def _read_bob_gcs(BUCKET, CHKPT_FILE):
 #     client = storage.Client()
-#     blob = download_blob_file(FLAGS.load_model)
-#     client.download_blob_to_file(os.path.join(gcs_uri, source_file_name), "/tmp/model-chkpt.pt")
+#     bucket = client.get_bucket(BUCKET)
+#     blob = bucket.get_blob(CHKPT_FILE)
+#     chkpt_file = blob.download_as_string()
+#     chkpt_file = chkpt_file.decode("utf-8")
+#     return chkpt_file
     
-#     print("Loading saved model {}".format(FLAGS.load_model))
-    
-# if FLAGS.load_model != "":
-#     _read_blob(
-    
-
 def identity(x):
     return x   
 
@@ -290,6 +292,14 @@ def train_imagenet():
         num_steps_per_epoch=num_training_steps_per_epoch,
         summary_writer=writer)
     loss_fn = nn.CrossEntropyLoss()
+    if FLAGS.load_chkpt_file != "":
+        xm.master_print("Loading saved model {}".format(FLAGS.load_chkpt_file))
+#         checkpoint = _read_bob_gcs(FLAGS.bucket, FLAGS.load_chkpt_file)
+        checkpoint = torch.load(FLAGS.load_chkpt_file)
+        model.load_state_dict(checkpoint['model_state_dict']).to(device)
+        optimizer.load_state_dict(checkpoint['opt_state_dict']).to(device)
+#         start_epoch = checkpoint['epoch']
+#         best_valid_acc = checkpoint['best_valid_acc']
     
 #     server = xp.start_server(profiler_port)
 
@@ -337,43 +347,63 @@ def train_imagenet():
         accuracy = xm.mesh_reduce('test_accuracy', accuracy_replica, np.mean)
         return accuracy, accuracy_replica, total_samples
 
+    # setup epoch loop
     train_device_loader = pl.MpDeviceLoader(train_loader, device)
     test_device_loader = pl.MpDeviceLoader(test_loader, device)
     accuracy, max_accuracy = 0.0, 0.0
     training_start_time = time.time()
-    best_valid_acc = 0.0
     
-    for epoch in range(1, FLAGS.num_epochs + 1):
+    if FLAGS.load_chkpt_file != "":
+        best_valid_acc = checkpoint['best_valid_acc']
+        start_epoch = checkpoint['epoch']
+        xm.master_print('Loaded Model CheckPoint: Epoch={}/{}, Val Accuracy={:.2f}%'.format(
+            start_epoch, FLAGS.num_epochs, best_valid_acc))
+    else:
+        best_valid_acc = 0.0
+        start_epoch = 1
+        
+#     if FLAGS.load_chkpt_file != "":
+#         start_epoch = checkpoint['epoch']
+#     else:
+#         start_epoch = 1
+    
+    for epoch in range(start_epoch, FLAGS.num_epochs + 1):
         xm.master_print('Epoch {} train begin {}'.format(
             epoch, test_utils.now()))
         replica_epoch_start = time.time()
         
         replica_train_samples, reduced_global = train_loop_fn(train_device_loader, epoch)
-        
         replica_epoch_time = time.time() - replica_epoch_start
         avg_epoch_time_mesh = xm.mesh_reduce('epoch_time', replica_epoch_time, np.mean)
         reduced_global = reduced_global * xm.xrt_world_size()
         xm.master_print('Epoch {} train end {}, Epoch Time={}, Replica Train Samples={}, Reduced GlobalRate={:.2f}'.format(
-            epoch, test_utils.now(), str(datetime.timedelta(seconds=avg_epoch_time_mesh)).split('.')[0], replica_train_samples, reduced_global))
+            epoch, test_utils.now(), 
+            str(datetime.timedelta(seconds=avg_epoch_time_mesh)).split('.')[0], 
+            replica_train_samples, 
+            reduced_global))
 
         accuracy, accuracy_replica, replica_test_samples = test_loop_fn(test_device_loader, epoch)
         xm.master_print('Epoch {} test end {}, Reduced Accuracy={:.2f}%, Replica Accuracy={:.2f}%, Replica Test Samples={}'.format(
-            epoch, test_utils.now(), accuracy, accuracy_replica, replica_test_samples))
-        if accuracy > best_valid_acc:
-            xm.master_print('Epoch {} validation accuracy improved from {:.2f}% to {:.2f}%.. saving model'.format(epoch, best_valid_acc, accuracy))
-            best_valid_acc = accuracy
-            xm.save(
-                {
-                    "epoch": epoch,
-                    "nepochs": FLAGS.num_epochs,
-                    "state_dict": model.state_dict(),
-                    "valid_acc": best_valid_acc,
-                    "opt_state_dict": optimizer.state_dict(),
-                },
-                FLAGS.save_model
-            )
-            if xm.is_master_ordinal():
-                _upload_blob(FLAGS.logdir, FLAGS.save_model, 'model-chkpt.pt')
+            epoch, test_utils.now(), 
+            accuracy, accuracy_replica, 
+            replica_test_samples))
+        
+        if FLAGS.save_model != "":
+            if accuracy > best_valid_acc:
+                xm.master_print('Epoch {} validation accuracy improved from {:.2f}% to {:.2f}% - saving model...'.format(epoch, best_valid_acc, accuracy))
+                best_valid_acc = accuracy
+                xm.save(
+                    {
+                        "epoch": epoch,
+                        "nepochs": FLAGS.num_epochs,
+                        "model_state_dict": model.state_dict(),
+                        "best_valid_acc": best_valid_acc,
+                        "opt_state_dict": optimizer.state_dict(),
+                    },
+                    FLAGS.save_model
+                )
+                if xm.is_master_ordinal():
+                    _upload_blob_gcs(FLAGS.logdir, FLAGS.save_model, 'model-chkpt.pt')
                             
         max_accuracy = max(accuracy, max_accuracy)
         test_utils.write_to_summary(
