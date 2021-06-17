@@ -306,9 +306,9 @@ def train_imagenet():
         _read_blob_gcs(FLAGS.model_bucket, FLAGS.load_chkpt_file, FLAGS.load_chkpt_dir)
         checkpoint = torch.load(FLAGS.load_chkpt_dir) # torch.load(FLAGS.load_chkpt_dir)
         model.load_state_dict(checkpoint['model_state_dict']) #.to(device)
-        model.to(device)
-        optimizer.load_state_dict(checkpoint['opt_state_dict']) #.to(device)
-        optimizer.to(device)
+        model = model.to(device)
+#         optimizer.load_state_dict(checkpoint['opt_state_dict']) #.to(device)
+#         optimizer.to(device)
 #         start_epoch = checkpoint['epoch']
 #         best_valid_acc = checkpoint['best_valid_acc']
     
