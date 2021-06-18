@@ -63,11 +63,11 @@ MODEL_OPTS = {
     },
     '--wds_traindir': {
         'type': str,
-        'default':'/tmp/imagenet',
+        'default':'/tmp/cifar',
     },
     '--wds_testdir': {
         'type': str,
-        'default': '/tmp/imagenet',
+        'default': '/tmp/cifar',
     },
     '--trainsize': {
         'type': int,
