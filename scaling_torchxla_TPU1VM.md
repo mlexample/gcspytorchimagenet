@@ -140,7 +140,7 @@ During training, you will see output for each logged step like this:
 * `10.164.0.25` refers to the IP address for this VM worker
 * `[0]` refers to VM worker 0. Remember, there are 4 VM workers in our example
 * `Training Device=xla:0/2` refers to the TPU core 2. In our example there are 32 TPU cores, so you should see up to `xla:0/31` (since they are 0-based)
-* `Rate=1079.01` refers to the examples per second for this TPU core for this step
+* `Rate=1079.01` refers to the exponential moving average of examples per second for this TPU core
 * `GlobalRate=1420.67` refers to the average number of examples per second for this core so far during this epoch
 
 At the end of each epoch’s train loop, you will see output like this:
