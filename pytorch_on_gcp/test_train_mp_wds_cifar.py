@@ -172,13 +172,11 @@ def _upload_blob_gcs(gcs_uri, source_file_name, destination_blob_name):
     xm.master_print("Saved Model Checkpoint file {} and uploaded to {}.".format(source_file_name, os.path.join(gcs_uri, destination_blob_name)))
     
 def _read_blob_gcs(BUCKET, CHKPT_FILE, DESTINATION):
+    """Downalods a file from GCS to local directory"""
     client = storage.Client()
     bucket = client.get_bucket(BUCKET)
     blob = bucket.get_blob(CHKPT_FILE)
     blob.download_to_filename(DESTINATION)
-#     chkpt_file = blob.download_as_string()
-#     chkpt_file = chkpt_file.decode("utf-8")
-#     return chkpt_file
     
 def identity(x):
     return x   
